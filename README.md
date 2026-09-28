@@ -26,10 +26,12 @@
 ```sh
 npm ci
 cp .env.example .env.local
-# 填入项目 URL 和公开 publishable key。
+# 示例已含公开连接配置；普通前端开发无需管理密钥。
 npm test
 npm run dev
 ```
+
+换电脑时，安装上述 Node.js 版本，克隆本仓库后执行这些命令即可。`.env.example` 已包含当前服务的公开地址和 publishable key；不要把管理密钥填进这个示例文件。内容库、Google 登录配置和账号记录都保留在云端，无需重新创建。只有批量发布卡片时，才需要从 Supabase 控制台取得管理密钥并填入被忽略的 `.env.local`。不要通过提交文件迁移密钥。
 
 预览地址：http://localhost:4173/Glimpse/。`PORT` 可调整预览端口；新的端口也需加入登录回跳地址白名单。`npm run build` 把原生 JavaScript 与 Supabase SDK 打包到 `dist/`。
 
