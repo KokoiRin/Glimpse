@@ -1,5 +1,5 @@
 // One visit owns an ordered deck. Revisiting never draws a different card.
-export function createFeed(cards, { energy = 'any', previousId, firstId, random = Math.random } = {}) {
+export function createFeed(cards, { energy = 'any', previousId, firstId, random = Math.random, limit = 14 } = {}) {
   const deck = cards.filter(card => energy === 'any' || card.energy === 'low');
   for (let index = deck.length - 1; index > 0; index--) {
     const other = Math.floor(random() * (index + 1));
@@ -10,6 +10,7 @@ export function createFeed(cards, { energy = 'any', previousId, firstId, random 
   }
   const requested = deck.findIndex(card => card.id === firstId);
   if (requested > 0) [deck[0], deck[requested]] = [deck[requested], deck[0]];
+  deck.splice(limit);
   let position = 0;
   return {
     get current() { return deck[position]; },

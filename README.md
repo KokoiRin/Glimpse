@@ -2,35 +2,53 @@
 
 随手探索，感兴趣就多停一下，随时可以离开。
 
-- [打开应用](https://kokoirin.github.io/Glimpse/)
-- [RIN III 项目介绍](https://kokoirin.github.io/rin3/me/glimpse/)
+[打开应用](https://kokoirin.github.io/Glimpse/) · [RIN III 项目介绍](https://kokoirin.github.io/rin3/me/glimpse/)
 
-## 体验
+## 内容和记录
 
-一屏一张卡，左右滑动或点击箭头切换。打开感兴趣的内容，继续深入或随时退出。当前有 8 张计算机与数学卡和 6 张生活体验卡，每轮有限，不自动无限推荐。
-
-支持「轻松点」、看过记录、喜欢 / 不感兴趣、记录导出和清除。记录只保存在当前浏览器，不上传、不跨设备同步。可以添加到主屏幕，目前仍需联网，不支持离线。
+- 从云端共享内容库准备每一轮，最多 14 张。左右切换、点开体验，随时结束。
+- 卡片独立发布，无需重新部署网页。已经开始的一轮保持原来的内容和顺序。
+- 未登录时记录保存在本机；通过 Google 登录后，同步打开记录和明确的喜欢、不感兴趣或撤销评价。
+- 同一账号跨设备同步，不同账号数据隔离。网络失败时操作等待重试，不把本地标记误报成云端已保存。
+- 首次登录可选择合并旧记录。浏览和停留等操作日志仅在本机保留，不参与云端同步。
+- 可添加到主屏幕。目前仍需联网加载应用；内容缓存不等于支持完整离线启动。
 
 ## 本地开发
 
-需要 Node.js 22.13 或更新版本，无需安装依赖。
+需要 Node.js 22.13 或更新版本。
 
 ```sh
+npm ci
+cp .env.example .env.local
+# 填入项目 URL 和公开 publishable key。
 npm test
 npm run dev
 ```
 
-打开 http://localhost:4173/Glimpse/。可以通过 `PORT` 调整端口。
+预览地址：http://localhost:4173/Glimpse/。`PORT` 可调整预览端口；新的端口也需加入登录回跳地址白名单。`npm run build` 把原生 JavaScript 与 Supabase SDK 打包到 `dist/`。
 
-## 文件与部署
+首次服务配置和上线步骤见 [部署说明](docs/deployment.md)。缺少公开项目配置时构建会失败，防止发布无法登录和读取内容的版本。
 
-- `public/`：完整的静态应用和独立的安装清单。
-- `tests/`：卡片、导航、反馈、控制器与部署资源检查。
-- `scripts/serve.mjs`：仅供本地预览的静态服务。
-- `.github/workflows/deploy-pages.yml`：推送 main 后运行测试，仅发布 public 到 GitHub Pages。
+## 更新卡片
+
+准备 JSON 文件，格式为 `{ "cards": [...], "unpublish": ["卡片ID"] }`。新增、修改的卡片放入 cards；下架 ID 放入 unpublish。修改内容时增加 version，不改变同一张卡片的 id。
+
+```sh
+# 先校验，不修改云端
+npm run content:publish -- --file content/initial-cards.json
+# 使用本地管理凭据，整批事务发布
+npm run content:publish -- --file 内容.json --publish
+```
+
+`content/initial-cards.json` 只用于首次导入，网页部署不会再次导入它。批量更新不要求提交或推送 GitHub。内容记录采用纯文本及已支持的互动类型，不执行远程脚本。
+
+## 测试与发布
+
+- `npm test`：内容、导航、控制器、同步、登录回调和真实 PostgreSQL 权限测试。
+- `npm run test:database`：用嵌入式 PostgreSQL 执行实际迁移，验证权限和事务；不连接生产数据库。
+- `npm run test:build`：构建后检查 Pages 子路径、资源和发布范围。
+- 推送 main 后运行检查、构建，只发布 `dist/`。管理密钥、迁移、测试和本地环境文件不会发布。
 
 ## 从 RIN III 迁入
 
-应用迁自 `KokoiRin/rin3` 的 `cb37067`，原目录为 `public/apps/glimpse/`。介绍页继续保留在 RIN III，旧应用地址跳转到本项目。
-
-保留原有 `rin-glimpse-events-v1` 和 `glimpse-records-v1` 存储键。新旧 GitHub Pages 地址同属 `https://kokoirin.github.io`，在同一浏览器存储环境中可继续读取既有记录；换浏览器、设备或域名不会自动迁移。主屏幕独立应用是否沿用 Safari 数据取决于系统的存储隔离方式。
+应用最初迁自 `KokoiRin/rin3` 的 `cb37067`。RIN III 介绍页与旧入口继续保留。现有 `glimpse-records-v1` 作为游客记录读取；已有记录可在 Google 登录后合并。`rin-glimpse-events-v1` 中的操作日志仍仅在原浏览器中保留。

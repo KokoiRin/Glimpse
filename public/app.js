@@ -1,16 +1,22 @@
-import { cards } from './cards.js';
-import { createFeedback } from './feedback.js';
+import { createCatalog } from './catalog.js';
+import { createCloud } from './cloud.js';
+import { createRecords } from './records.js';
+import { initializeAuth } from './auth.js';
 import { createFeed, swipeDirection } from './navigation.js';
 
 // This page owns the feed/session. Feedback and interaction events stay in this browser.
 const main = document.querySelector('#main');
 const dialog = document.querySelector('#about');
-const KEY = 'rin-glimpse-events-v1';
+let KEY = 'rin-glimpse-events-v1';
+let cards = [], roundRequest = 0, accountId = null;
+const dismissedMerges = new Set();
+const cloud = createCloud({url:__SUPABASE_URL__,key:__SUPABASE_KEY__,redirectTo:new URL('./',location.href).href});
 const menuDialog = document.querySelector('#menu-dialog');
 const historyDialog = document.querySelector('#history-dialog');
 // Storage can be denied even when the page itself is usable.
 const storage = {getItem:key=>localStorage.getItem(key),setItem:(key,value)=>localStorage.setItem(key,value),removeItem:key=>localStorage.removeItem(key)};
-const feedback = createFeedback(storage);
+const catalog = createCatalog({storage,fetchCards:()=>cloud ? cloud.fetchCards() : Promise.reject(Error('未配置云端'))});
+const feedback = createRecords({storage,remote:cloud?.records,onChange:refreshAccountUI});
 let historyFilter = 'opened';
 const session = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
 let events = [], storageAvailable = true;
@@ -40,7 +46,18 @@ function art(card) {
  else body='<rect width="360" height="310" fill="#d9e0d1"/><rect x="103" y="41" width="157" height="230" rx="23" fill="#466754"/><rect x="116" y="59" width="131" height="190" rx="13" fill="#f7f2dc"/><rect x="132" y="93" width="91" height="30" rx="9" fill="#bacbad"/><rect x="132" y="137" width="70" height="30" rx="9" fill="#e0cea1"/><rect x="132" y="181" width="91" height="30" rx="9" fill="#8ba88d"/>';
  return `${common}${body}</svg><span class="art-label">${card.energy==='high'?'一点好奇':'一点留白'}</span>`;
 }
-function startRound() {
+async function startRound() {
+ const request = ++roundRequest;
+ view='loading';
+ main.className='end-view'; main.innerHTML='<section class="end"><p role="status">正在准备这一轮内容…</p></section>';
+ const loaded = await catalog.load();
+ if(request !== roundRequest)return;
+ cards = loaded.cards;
+ byId('catalog-status').textContent = loaded.error ? (loaded.stale?'当前展示上次保存的内容。':'')+loaded.error : '';
+ byId('catalog-notice').textContent=byId('catalog-status').textContent;
+ byId('catalog-notice').hidden=!loaded.error;
+ byId('retry-content').hidden = !loaded.error;
+ byId('sources').innerHTML=cards.map(c=>`<p><strong>${escape(c.title.replace('\n',''))}</strong><br>${escape(c.source)}</p>`).join('');
  const previousId = current?.id ?? [...events].reverse().find(e => e.action === 'impression')?.cardId;
  feed = createFeed(cards.filter(card=>feedback.get(card.id)?.reaction!=='dislike'), { energy, previousId });
  showCard();
@@ -141,7 +158,7 @@ function renderRecords() {
  byId('record-tabs').innerHTML=Object.entries(labels).map(([key,label])=>`<button class="quiet" id="filter-${key}" aria-pressed="${key===historyFilter}">${label}</button>`).join('');
  Object.keys(labels).forEach(key=>on(`filter-${key}`,()=>{historyFilter=key;renderRecords();}));
  const rows=feedback.all().filter(row=>historyFilter==='opened'?row.opens>0:row.reaction===historyFilter).sort((a,b)=>(b.ratedAt||b.lastOpenedAt||'').localeCompare(a.ratedAt||a.lastOpenedAt||''));
- byId('record-list').innerHTML=rows.length?rows.map(row=>`<div class="record-row"><button class="record-title" id="record-${escape(row.id)}" ${cards.some(c=>c.id===row.id)?'':'disabled'}>${escape(row.title.replace('\n',''))}</button><p>${escape(row.parent)} · ${row.opens?'看过':'尚未展开'}${row.reaction==='like'?' · 喜欢':row.reaction==='dislike'?' · 不感兴趣':''}</p>${row.reaction?`<button class="quiet" id="unrate-${escape(row.id)}">取消标记</button>`:''}</div>`).join(''):'<p class="empty-records">这里暂时没有记录。遇到感兴趣的内容，再慢慢留下就好。</p>';
+ byId('record-list').innerHTML=rows.length?rows.map(row=>`<div class="record-row"><button class="record-title" id="record-${escape(row.id)}" ${cards.some(c=>c.id===row.id)?'':'disabled'}>${escape(row.title.replace('\n',''))}</button><p>${escape(row.parent)}${cards.some(c=>c.id===row.id)?'':' · 内容已下架或暂不可用'} · ${row.opens?'看过':'尚未展开'}${row.reaction==='like'?' · 喜欢':row.reaction==='dislike'?' · 不感兴趣':''}</p>${row.reaction?`<button class="quiet" id="unrate-${escape(row.id)}">取消标记</button>`:''}</div>`).join(''):'<p class="empty-records">这里暂时没有记录。遇到感兴趣的内容，再慢慢留下就好。</p>';
  rows.forEach(row=>{
   const card=cards.find(c=>c.id===row.id);
   on(`unrate-${row.id}`,()=>{feedback.rate(card||row,null);renderRecords();});
@@ -158,7 +175,7 @@ function end() {
  if(view!=='end')record('deck_end',{from:view});
  main.className='end-view';
  view='end'; history.replaceState(null,'',location.pathname);
- main.innerHTML=`<section class="end"><div class="symbol" aria-hidden="true">✳</div><p class="eyebrow">留白也是一种选择</p><h2>这几张，先到这里。</h2><p>这轮可看的卡片到这里了。也可以从右上角菜单里的“我的记录”找回之前的内容。<br>现在可以直接关掉这一页。</p>${feed.current?'<button class="quiet" id="return-last">← 回看最后一张</button><br>':''}<button class="secondary" id="restart">再随便看看 ↗</button></section>`;
+ main.innerHTML=`<section class="end"><div class="symbol" aria-hidden="true">✳</div><p class="eyebrow">留白也是一种选择</p><h2>${cards.length?'这几张，先到这里。':'暂时没有可浏览的内容。'}</h2><p>这轮可看的卡片到这里了。也可以从右上角菜单里的“我的记录”找回之前的内容。<br>现在可以直接关掉这一页。</p>${feed.current?'<button class="quiet" id="return-last">← 回看最后一张</button><br>':''}<button class="secondary" id="restart">再随便看看 ↗</button></section>`;
  on('restart',()=>{startRound();focusHeading();});on('return-last',()=>{showCard(true);focusHeading();});focusHeading();
 }
 window.addEventListener('keydown',event=>{
@@ -168,18 +185,19 @@ window.addEventListener('keydown',event=>{
 });
 window.addEventListener('popstate',()=>{if(view==='trial'){record('back');view='feed';renderFeed();focusHeading();}});
 window.addEventListener('pagehide',()=>{if(view!=='end')record('page_leave',{from:view});pauseClock();});
-window.addEventListener('pageshow',resumeClock);
-document.addEventListener('visibilitychange',()=>{if(document.hidden){if(view!=='end')record('background',{from:view});pauseClock();}else resumeClock();});
+window.addEventListener('pageshow',()=>{resumeClock();void feedback.sync();});
+window.addEventListener('online',()=>{void feedback.sync();});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){if(view!=='end')record('background',{from:view});pauseClock();}else {resumeClock();void feedback.sync();}});
 on('menu-toggle',()=>{pauseClock();menuDialog.showModal();});
 menuDialog.addEventListener('close',resumeClock);
 on('records',()=>{menuDialog.close();pauseClock();renderRecords();historyDialog.showModal();});
 function refreshFeedbackAfterDialog() {
- if(view==='feed')renderFeed();
+ if(view==='feed' && current)renderFeed();
  if(view==='trial'){const reaction=feedback.get(current.id)?.reaction;byId('like')?.setAttribute('aria-pressed',String(reaction==='like'));byId('dislike')?.setAttribute('aria-pressed',String(reaction==='dislike'));if(byId('feedback-note'))byId('feedback-note').textContent=reaction==='like'?'已标记喜欢':reaction==='dislike'?'下轮不再主动推荐':'';}
  resumeClock();
 }
 historyDialog.addEventListener('close',refreshFeedbackAfterDialog);
-on('data',()=>{menuDialog.close();pauseClock();dialog.showModal();byId('storage-status').textContent=storageAvailable&&feedback.available?'记录只保存在这个浏览器。看过与反馈会保留；操作明细最多保留最近 2,000 条。':'浏览器暂时不能保存记录；当前体验仍然可用，可以导出本次记录。';});
+on('data',()=>{menuDialog.close();pauseClock();dialog.showModal();refreshAccountUI();});
 dialog.addEventListener('close',refreshFeedbackAfterDialog);
 let exportUrl;
 on('export',()=>{
@@ -189,7 +207,79 @@ on('export',()=>{
  byId('export-preview').innerHTML='<label for="event-json">试用记录（可全选复制）</label><textarea id="event-json" readonly rows="7"></textarea><a class="secondary" id="download-json" download="Glimpse-试用记录.json">下载 JSON 文件 ↗</a>';
  byId('event-json').value=serialized;byId('download-json').href=exportUrl;
 });
-on('clear',()=>{events=[];feedback.clear();byId('export-preview').replaceChildren();if(exportUrl){URL.revokeObjectURL(exportUrl);exportUrl=null;}try{localStorage.removeItem(KEY);storageAvailable=true;byId('storage-status').textContent=feedback.available?'已清除本机记录。之后的新操作会重新开始记录。':'内存已清除，但浏览器存储不可访问，无法确认全部旧记录已删除。';}catch{storageAvailable=false;byId('storage-status').textContent='已清除本次内存记录；浏览器存储不可访问，无法确认旧记录已删除。';}});
-byId('sources').innerHTML=cards.map(c=>`<p><strong>${escape(c.title.replace('\n',''))}</strong><br>${escape(c.source)}</p>`).join('');
-// A reload starts a fresh visit instead of resuming an abandoned activity.
-history.replaceState(null,'',location.pathname);startRound();
+on('clear',async()=>{
+ const cleared = await feedback.clear();
+ if(!cleared){byId('storage-status').textContent='仍有未同步记录或本机存储不可用，缓存没有清除。';return;}
+ events=[];byId('export-preview').replaceChildren();
+ if(exportUrl){URL.revokeObjectURL(exportUrl);exportUrl=null;}
+ try{localStorage.removeItem(KEY);storageAvailable=true;}catch{storageAvailable=false;}
+ byId('storage-status').textContent=feedback.user?'本机缓存已清理。云端记录仍保留，同步后会重新显示。':'已清除本机记录。之后的新操作会重新开始记录。';
+});
+
+function refreshAccountUI() {
+ const user=feedback.user;
+ byId('account-name').textContent=user?`当前账号：${user.email || 'Google 用户'}`:'登录后，可在不同设备同步记录';
+ byId('account-status').textContent=feedback.status;
+ byId('login').hidden=!!user;
+ byId('logout').hidden=!user;
+ byId('sync').hidden=!user;
+ byId('guest-merge').hidden=!feedback.hasGuestRecords || dismissedMerges.has(user?.id);
+ byId('records-note').textContent=user?'看过和评价保存在你的账号中；点开不等于喜欢。':'记录目前保存在本机，登录后可以选择合并到账号。';
+ byId('clear').textContent=user?'清除本机缓存':'清除本机记录';
+ byId('storage-status').textContent=feedback.status+(user?'。操作明细仍仅保存在本机；清除缓存不会删除云端记录。':'。操作明细最多保留最近 2,000 条。');
+ if(current && byId('like')) {
+  const reaction=feedback.get(current.id)?.reaction;
+  byId('like').setAttribute('aria-pressed',String(reaction==='like'));
+  byId('dislike').setAttribute('aria-pressed',String(reaction==='dislike'));
+  byId('feedback-note').textContent=reaction==='like'?'已标记喜欢':reaction==='dislike'?'下轮不再主动推荐':'';
+ }
+ if(historyDialog.open)renderRecords();
+}
+function changeUser(user) {
+ const next=user?.id ?? null;
+ if(next!==accountId) {
+  accountId=next;
+  byId('export-preview').replaceChildren();
+  if(exportUrl){URL.revokeObjectURL(exportUrl);exportUrl=null;}
+  KEY=next?`glimpse-events-v2:${next}`:'rin-glimpse-events-v1';
+  try {const saved=JSON.parse(storage.getItem(KEY)||'[]');events=Array.isArray(saved)?saved.slice(-2000):[];}catch{events=[];}
+ }
+ feedback.setUser(user);
+ void feedback.sync();
+}
+on('login',async()=>{
+ if(!cloud){byId('account-status').textContent='登录尚未配置，请稍后重试。';return;}
+ byId('login').disabled=true;
+ try {
+  const {error}=await cloud.auth.signInWithOAuth({provider:'google',options:{redirectTo:cloud.redirectTo,scopes:'openid email profile'}});
+  if(error)throw error;
+ }catch{byId('account-status').textContent='暂时无法打开 Google 登录，请稍后重试。';byId('login').disabled=false;}
+});
+on('logout',async()=>{
+ changeUser(null);
+ const {error}=await cloud.auth.signOut({scope:'local'});
+ if(error)byId('account-status').textContent='退出请求失败，请重试或关闭当前页面。';
+});
+on('sync',()=>{void feedback.sync();});
+on('merge',async()=>{
+ byId('merge').disabled=true;
+ const ok=await feedback.mergeGuest();
+ byId('merge').disabled=false;refreshAccountUI();
+ if(!ok)byId('account-status').textContent='浏览器无法安全保存合并记录，请先导出本机记录。';
+});
+on('merge-later',()=>{dismissedMerges.add(feedback.user?.id);refreshAccountUI();});
+on('retry-content',()=>{void startRound();});
+
+async function boot() {
+ refreshAccountUI();
+ if(cloud) {
+  try {
+   const result=await initializeAuth({auth:cloud.auth,url:location.href,replaceUrl:path=>history.replaceState(null,'',path),onUser:changeUser});
+   if(result.error)byId('auth-notice').textContent=result.error;
+  }catch{byId('auth-notice').textContent='暂时无法恢复登录，你仍可以浏览；请在菜单中重试登录。';}
+ }
+ // The callback has been handled; a reload starts a new, finite visit.
+ history.replaceState(null,'',location.pathname);
+ await startRound();
+}
+export const ready = boot();

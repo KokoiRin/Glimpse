@@ -1,0 +1,333 @@
+{
+  "cards": [
+    {
+      "id": "gc-graph",
+      "version": 1,
+      "type": "计算机 · 图",
+      "topic": "graphs",
+      "parent": "对象引用 → 图的可达性",
+      "energy": "high",
+      "time": "2 分钟",
+      "art": "graph",
+      "title": "两个对象互相引用，\n为什么还能一起消失？",
+      "teaser": "A 牵着 B，B 也牵着 A。但如果外面已经找不到它们，这个小圈子还算“活着”吗？",
+      "action": "剪掉一条线看看",
+      "trialTitle": "“有引用”与“能被找到”差了一步",
+      "trial": "把对象看成点，把引用看成有方向的线。从程序仍然能访问的根出发，沿着线找：走得到的对象，才是可达的。\n\n点下面的按钮，移除根到 A 的引用。A 与 B 互相引用的两条线仍然保留。",
+      "widget": "reachability",
+      "moreTitle": "原来这也是一个图问题",
+      "more": "在基于可达性追踪的垃圾回收模型中，外界无法到达的 A、B 可以一起成为回收对象；它们互相引用并不能让自己重新连接到根。\n\n这解释的是“是否有资格被回收”，并不保证立即释放内存。下一条岔路：引用计数为何需要额外处理循环引用？",
+      "source": "简化模型：从内存管理延伸到有向图与可达性。",
+      "link": "https://kokoirin.github.io/rin3/reading/android-foundations/memory/",
+      "linkLabel": "接着看：Android 内存管理"
+    },
+    {
+      "id": "queue",
+      "version": 2,
+      "type": "计算机 · 调度",
+      "topic": "concurrency",
+      "parent": "Handler → 消息循环 → 调度",
+      "energy": "high",
+      "time": "2 分钟",
+      "art": "queue",
+      "title": "“两秒后执行”，\n真的刚好是两秒吗？",
+      "teaser": "任务已经到点，主线程却还在忙。计时到了，和轮到你，是两件事。",
+      "action": "看看队伍怎么走",
+      "trialTitle": "到点，只是具备了运行条件",
+      "trial": "想象当前任务还要运行 5 秒，你又投递了一个延迟 2 秒的任务。它不能在第 2 秒中途抢走正在执行的主线程。\n\n下面是简化的顺序处理演示，不是实时计时器。",
+      "widget": "queue",
+      "moreTitle": "继续到“调度”这一层",
+      "more": "延迟投递表达的是一个可执行时间，而非精确执行时刻。线程被占用、队列中的其他工作，都可能让实际运行更晚。\n\nHandler 把工作交给所关联的 Looper；post 本身不会自动把工作搬到后台线程。",
+      "source": "Android Handler 官方 API；简化为单线程顺序示例。",
+      "link": "https://developer.android.com/reference/android/os/Handler",
+      "linkLabel": "接着看：Handler 的投递语义"
+    },
+    {
+      "id": "state-machine",
+      "version": 1,
+      "type": "计算机 · 建模",
+      "topic": "state",
+      "parent": "Activity 生命周期 → 状态机",
+      "energy": "high",
+      "time": "1 分钟",
+      "art": "state",
+      "title": "三个布尔值，\n能拼出一个不可能的页面？",
+      "teaser": "isLoading = true，hasData = true，hasError = true。这个界面到底该显示什么？",
+      "action": "看看另一种表达",
+      "trialTitle": "先决定哪些组合有意义",
+      "trial": "假设这一版页面只允许四种互斥状态：未开始、加载中、成功、失败。\n\n三个布尔值有 2³ = 8 种组合；一个明确的四选一状态，能直接排除其余组合。",
+      "choices": [
+        {
+          "label": "那刷新时保留旧内容呢？",
+          "reply": "好问题：原来的四状态模型不够用了。可以增加“有旧内容且正在刷新”等合法状态，或把互相独立的维度拆开。模型应服从真实行为。"
+        },
+        {
+          "label": "所以布尔值都不好？",
+          "reply": "不是。互相独立的开关很适合布尔值；问题是把互相约束的状态拆开后，约束藏到了各处判断里。"
+        }
+      ],
+      "moreTitle": "从状态走到变化",
+      "more": "再画几条箭头：未开始 → 加载中 → 成功或失败。箭头描述允许发生的变化，这就碰到了状态机。\n\n下一条岔路：哪些变化由用户触发，哪些由异步结果触发？",
+      "source": "原创界面建模示例；基于集合计数与有限状态机。",
+      "link": "https://kokoirin.github.io/rin3/reading/android-foundations/lifecycle/",
+      "linkLabel": "接着看：Activity 的状态与转换"
+    },
+    {
+      "id": "stack",
+      "version": 1,
+      "type": "计算机 · 数据结构",
+      "topic": "structures",
+      "parent": "任务与返回栈 → 栈",
+      "energy": "high",
+      "time": "1 分钟",
+      "art": "state",
+      "title": "进了 A，再进 B、C。\n“返回”是回到哪里？",
+      "teaser": "最晚压进去的 C，最先被拿走。页面导航里藏着一个很朴素的数据结构。",
+      "action": "试着弹出一页",
+      "trialTitle": "栈只盯着最上面",
+      "trial": "在一个普通的简化返回栈里，A → B → C 表示从 A 依次打开 B、C。此刻 C 在栈顶。",
+      "choices": [
+        {
+          "label": "返回一次",
+          "reply": "C 出栈，B 露出来。栈现在是 A → B。"
+        },
+        {
+          "label": "直接回 A 呢？",
+          "reply": "那就不只是一次普通弹栈了：需要明确要如何处理 B、C。Android 的启动模式和 flags 会进一步影响真实任务行为。"
+        }
+      ],
+      "moreTitle": "一个结构，很多入口",
+      "more": "后进先出也出现在函数调用、括号匹配等地方。相同的结构，可以解释看起来不相干的现象。\n\n这里是理解入口；真实 Android 根页面的返回、复用和多任务规则还需要另看具体情境。",
+      "source": "原创栈示例；Android 官方任务与返回栈资料。",
+      "link": "https://kokoirin.github.io/rin3/reading/android-foundations/tasks/",
+      "linkLabel": "接着看：任务与返回栈"
+    },
+    {
+      "id": "composition",
+      "version": 1,
+      "type": "数学 · 组合",
+      "topic": "composition",
+      "parent": "函数 → 函数组合",
+      "energy": "high",
+      "time": "1 分钟",
+      "art": "math",
+      "title": "先加一再乘二，\n和先乘二再加一一样吗？",
+      "teaser": "从 3 出发，一条路到 8，另一条路到 7。顺序已经写进结果里。",
+      "action": "换个顺序试试",
+      "trialTitle": "组合可以结合，不一定交换",
+      "trial": "设 f(x) = x + 1，g(x) = 2x。\n\ng(f(3)) = 8，f(g(3)) = 7。\n\n函数组合通常不能随意交换顺序。",
+      "choices": [
+        {
+          "label": "那“结合”说的是什么？",
+          "reply": "三个能接起来的函数，只改变括号，不改变顺序：(h ∘ g) ∘ f = h ∘ (g ∘ f)。两边都先做 f，再做 g，最后做 h。"
+        },
+        {
+          "label": "程序里也会碰到吗？",
+          "reply": "“先过滤再取前十项”和“先取前十项再过滤”可能给出不同结果。看清管线中的顺序，往往比记住函数名更有用。"
+        }
+      ],
+      "moreTitle": "从小算式走向范畴论",
+      "more": "你已经碰到了两个可以分开看的问题：东西能不能接上，以及接上以后哪些关系保持不变。范畴论把对象与可组合的箭头放在同一张图里研究。",
+      "source": "原创算例；只对可组合的函数讨论结合律。",
+      "link": "https://kokoirin.github.io/rin3/reading/category-theory-for-programmers/category-the-essence-of-composition/",
+      "linkLabel": "接着看：组合的本质"
+    },
+    {
+      "id": "types-count",
+      "version": 1,
+      "type": "数学 · 类型",
+      "topic": "types",
+      "parent": "数据类型 → 和与积",
+      "energy": "high",
+      "time": "1 分钟",
+      "art": "math",
+      "title": "为什么有些类型相加，\n有些类型相乘？",
+      "teaser": "两种颜色、三种尺寸。一件衣服同时选颜色和尺寸，有 6 种组合；一个值二选一，又会怎样？",
+      "action": "看看 6 和 5 从哪来",
+      "trialTitle": "“同时有”与“选一个”",
+      "trial": "颜色有 2 种，尺寸有 3 种。\n\n同时保存颜色和尺寸的 pair，有 2 × 3 = 6 个可能值。\n\n带标签地选择“一个颜色”或“一个尺寸”，有 2 + 3 = 5 个可能值。",
+      "choices": [
+        {
+          "label": "为什么强调带标签？",
+          "reply": "标签说明这个值来自哪一边。即使两边都写着“1”，Color(1) 与 Size(1) 仍是不同的选择。"
+        },
+        {
+          "label": "和写代码有什么关系？",
+          "reply": "记录里的多个字段像“同时有”；成功或失败这类带分支标签的结果像“选一个”。这给类型设计提供了一种计数视角。"
+        }
+      ],
+      "moreTitle": "再想一个很小的类型",
+      "more": "如果某类型有 n 个可能值，加上一个单独的“没有值”分支，就变成 n + 1 种。\n\n这里计算有限类型的值数，不是在计算运行时占多少字节。",
+      "source": "原创有限类型计数示例。",
+      "link": "https://kokoirin.github.io/rin3/reading/category-theory-for-programmers/simple-algebraic-data-types/",
+      "linkLabel": "接着看：简单代数数据类型"
+    },
+    {
+      "id": "snapshot",
+      "version": 1,
+      "type": "计算机 · 数据流",
+      "topic": "state",
+      "parent": "UI 状态 → StateFlow → 快照与事件",
+      "energy": "high",
+      "time": "1 分钟",
+      "art": "state",
+      "title": "现在音量是 30，\n等于刚刚按了三次加号吗？",
+      "teaser": "一个描述“现在是多少”，一个描述“刚才发生了什么”。保存它们的方式可能很不一样。",
+      "action": "拆开这两件事",
+      "trialTitle": "状态是此刻，事件是发生过",
+      "trial": "音量从 10 变成 20，再变成 30。一个刚加入的观察者，可能只需要知道现在是 30。\n\n如果你要统计每一次按键，只拿最终的 30 就不够了。",
+      "choices": [
+        {
+          "label": "StateFlow 更接近哪一个？",
+          "reply": "更接近当前状态：它有初始值，保存最新值，并以相等性合并更新。慢收集者可能跳过中间值。"
+        },
+        {
+          "label": "那中间值丢掉是不是 bug？",
+          "reply": "要看需求。刷新当前音量可能没问题；记录每次操作则需要另一条可靠的事件记录路径。先分清你要保存什么。"
+        }
+      ],
+      "moreTitle": "继续往“历史”走一步",
+      "more": "同样是数据流，“此刻是什么”和“发生过哪些变化”要求不同。\n\n下一条岔路：如果只保存事件，能不能重建状态？这会引出事件日志与状态重建。",
+      "source": "Kotlin StateFlow 官方 API；原创音量示例。",
+      "link": "https://kotlinlang.org/api/kotlinx.coroutines/kotlinx-coroutines-core/kotlinx.coroutines.flow/-state-flow/",
+      "linkLabel": "接着看：StateFlow 的契约"
+    },
+    {
+      "id": "counterexample",
+      "version": 1,
+      "type": "数学 · 逻辑",
+      "topic": "logic",
+      "parent": "程序测试 → 全称命题与反例",
+      "energy": "high",
+      "time": "1 分钟",
+      "art": "math",
+      "title": "试了 100 次都对，\n为什么还不能说永远对？",
+      "teaser": "“所有偶数都能被 4 整除。”只试 4、8、12 很顺，碰到 6 就结束了。",
+      "action": "看看一个反例的分量",
+      "trialTitle": "“有一个”就能推翻“所有”",
+      "trial": "有限几个通过的例子，通常不足以证明对无限多个输入都成立。\n\n但只要找到一个满足前提、却不满足结论的例子，全称命题就被推翻了。6 是偶数，却不能被 4 整除。",
+      "choices": [
+        {
+          "label": "那测试还有什么用？",
+          "reply": "测试能找到反例，并为已经覆盖的行为提供证据。“有用”与“证明所有输入正确”是不同强度的结论。"
+        },
+        {
+          "label": "如果输入一共只有 4 种？",
+          "reply": "若确实穷举了全部输入，且观察与判定可靠，就能对这个有限范围得出更强结论。关键是范围是否真的完整。"
+        }
+      ],
+      "moreTitle": "把注意力放到前提上",
+      "more": "一个反例必须落在命题声称覆盖的范围里。若规则只谈正整数，拿负数反驳就没有击中它。\n\n下一条岔路：如何用性质测试去寻找你没想到的输入？",
+      "source": "原创基础逻辑与测试示例。"
+    },
+    {
+      "id": "rain-window",
+      "version": 1,
+      "type": "生活 · 场景",
+      "topic": "immersion",
+      "parent": "想象 → 感官细节",
+      "energy": "low",
+      "time": "1 分钟",
+      "art": "rain",
+      "title": "雨落在窗外，\n这会儿没有人等你回复。",
+      "teaser": "你坐在靠窗的位置。桌上有一杯温热的东西，远处只有很轻的说话声。",
+      "action": "在这里坐一会儿",
+      "trialTitle": "把这一小段时间留在窗边",
+      "trial": "想象玻璃上有一滴水，慢慢汇进另一滴，再一起往下滑。\n\n杯子不需要马上喝完。手机暂时反扣在桌上。你不用想好下一件事，也不用从这个场景里得到什么。",
+      "moreTitle": "再留一个细节",
+      "more": "桌面有一小块被灯照亮的木纹。你把杯子挪开，看到一个浅浅的水印。\n\n如果想象没有画面，也可以只读到这里。",
+      "source": "原创想象场景；可随时睁眼、略过或离开。"
+    },
+    {
+      "id": "feet",
+      "version": 1,
+      "type": "生活 · 正念",
+      "topic": "grounding",
+      "parent": "注意 → 当下的接触感",
+      "energy": "low",
+      "time": "30 秒",
+      "art": "outside",
+      "title": "椅子正在托住你。\n你不需要帮它用力。",
+      "teaser": "不用闭眼。只留意一下脚底与地面，或者背部和椅背接触的地方。",
+      "action": "留意一个接触点",
+      "trialTitle": "只找一处现在就有的感觉",
+      "trial": "如果姿势舒服，把注意轻轻放在脚底、坐垫或椅背任意一处。\n\n是温暖、凉、压着、软，还是没什么特别？不需要改正感觉，也不需要集中得很好。",
+      "moreTitle": "注意跑开也没关系",
+      "more": "发现自己想到别处了，可以回来一次，也可以就此结束。\n\n这是一段可选的日常留意，不是完成标准。",
+      "source": "日常感官留意邀请；无疗效承诺，不记录身体感受。"
+    },
+    {
+      "id": "sounds",
+      "version": 1,
+      "type": "生活 · 正念",
+      "topic": "grounding",
+      "parent": "注意 → 听见与命名",
+      "energy": "low",
+      "time": "30 秒",
+      "art": "outside",
+      "title": "先别给声音起名字，\n只听它出现又消失。",
+      "teaser": "也许是空调、车流、键盘，或房间里很轻的一声。你不用去寻找“安静”。",
+      "action": "听一小会儿",
+      "trialTitle": "把一个声音留成声音",
+      "trial": "保持自然的姿势，听一下此刻的环境。\n\n选一个已经听到的声音，留意它是连续的，还是断断续续的。若听不清，或环境让你不舒服，直接换一张就好。",
+      "moreTitle": "不用把想法赶走",
+      "more": "脑中冒出“这声音真吵”也可以。你只是碰到一个声音，又碰到一个想法。\n\n不用把这次体验做成安静的样子。",
+      "source": "原创日常注意力邀请；不要求闭眼或隔绝环境。"
+    },
+    {
+      "id": "shoulders",
+      "version": 1,
+      "type": "生活 · 放松",
+      "topic": "rest",
+      "parent": "姿势 → 少用一点力",
+      "energy": "low",
+      "time": "30 秒",
+      "art": "coffee",
+      "title": "如果方便，\n让肩膀少用一点力。",
+      "teaser": "不必深呼吸，也不用挺直。只是看看此刻的姿势能不能稍微省力一点。",
+      "action": "找个舒服一点的位置",
+      "trialTitle": "不需要一个“正确姿势”",
+      "trial": "把手放在舒服的位置。留意自己有没有把肩膀抬着，或者牙齿咬得很紧。\n\n如果愿意，轻轻松开一点，保持自然呼吸。没有感觉也可以，不需要反复检查。",
+      "moreTitle": "到这里就够了",
+      "more": "让视线落在一个不费力的位置。\n\n这段时间可以什么也不推进。动作若不舒服就停下，不必完成。",
+      "source": "温和的日常放松邀请；不包含屏息、拉伸或治疗建议。"
+    },
+    {
+      "id": "train",
+      "version": 1,
+      "type": "生活 · 场景",
+      "topic": "immersion",
+      "parent": "想象 → 暂时没有决定",
+      "energy": "low",
+      "time": "1 分钟",
+      "art": "outside",
+      "title": "列车已经开了，\n接下来一站不用你驾驶。",
+      "teaser": "窗外的房屋向后退，车厢轻轻摇晃。票在口袋里，行李也放好了。",
+      "action": "靠着窗坐一会儿",
+      "trialTitle": "此刻可以只做乘客",
+      "trial": "想象你靠在座椅上，看窗外一棵树很快掠过，又看远处的山慢慢移动。\n\n这一段路已经在往前走。暂时不用挑路线，不用催它快一点。",
+      "moreTitle": "把场景停在这里",
+      "more": "车厢里有人翻过一页书，又安静下来。\n\n你可以继续看窗外，也可以结束这段想象，回到现在的房间。",
+      "source": "原创想象场景；无需闭眼，不要求产生特定情绪。"
+    },
+    {
+      "id": "pause",
+      "version": 1,
+      "type": "生活 · 留白",
+      "topic": "rest",
+      "parent": "间隙 → 不急着填满",
+      "energy": "low",
+      "time": "20 秒",
+      "art": "rain",
+      "title": "这一小会儿，\n可以没有下一步。",
+      "teaser": "你已经来到这一页。现在不必决定要学习、放松，还是做一件有意义的事。",
+      "action": "暂时停在这里",
+      "trialTitle": "不用马上把空白填起来",
+      "trial": "看看眼前任何一个物件。让呼吸按原来的样子进行。\n\n这张卡没有问题等你回答，也没有计时结束的铃声。想离开时，就离开。",
+      "moreTitle": "如果你还在这里",
+      "more": "你可以按“到这里就好”，关掉这页。\n\n也可以再翻一张。两种选择都不需要解释。",
+      "source": "原创留白邀请；不记录私人想法或评价休息效果。"
+    }
+  ],
+  "unpublish": []
+}

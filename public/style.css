@@ -9,3 +9,7 @@ dialog{border:1px solid var(--line);border-radius:20px;padding:26px;max-width:51
 /* Very short windows retain access to content instead of clipping larger text. */
 @media(max-height:560px),(max-width:350px){body:has(.feed-view){overflow:auto}.shell:has(.feed-view){height:auto;min-height:100svh}.feed-view{height:auto}.card{grid-template-rows:120px auto auto;touch-action:pan-y pinch-zoom}.card-content{padding:18px}.feedback button{padding:8px}.card-tools{padding-left:6px;padding-right:6px}h2{font-size:24px}}
 @media(prefers-reduced-motion:no-preference){.card,.trial,.end{animation:arrive .2s ease-out}@keyframes arrive{from{opacity:.6}to{opacity:1}}}
+
+[hidden]{display:none!important}#auth-notice:empty{display:none}#auth-notice{font-size:12px;line-height:1.6}#guest-merge{border-top:1px solid var(--line);margin-top:16px;padding-top:8px}#account-name{overflow-wrap:anywhere}
+
+.shell:has(.feed-view){display:flex;flex-direction:column}.feed-view{height:auto;flex:1;min-height:0}#auth-notice,#catalog-notice{font-size:12px;line-height:1.5;margin:4px 48px 8px 0}

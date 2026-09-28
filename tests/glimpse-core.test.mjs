@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createFeed, swipeDirection } from '../public/navigation.js';
 import { createFeedback } from '../public/feedback.js';
-import { cards } from '../public/cards.js';
+import { readFileSync } from 'node:fs';
+const cards=JSON.parse(readFileSync(new URL('../content/initial-cards.json',import.meta.url),'utf8')).cards;
 const samples=cards.slice(0,4);
 function memory(){const map=new Map();return {getItem:k=>map.get(k)||null,setItem:(k,v)=>map.set(k,v),removeItem:k=>map.delete(k)};}
 
@@ -18,3 +19,5 @@ test('a disliked card can be excluded from new rounds and recovered after unmark
 test('storage denial retains this visits feedback and reports it is not saved',()=>{const f=createFeedback({getItem(){throw Error();},setItem(){throw Error();},removeItem(){throw Error();}});f.open(cards[0]);f.rate(cards[0],'like');assert.equal(f.available,false);assert.equal(f.get(cards[0].id).reaction,'like');});
 test('clear removes explicit feedback and persisted seen history',()=>{const s=memory(),f=createFeedback(s);f.open(cards[0]);f.rate(cards[0],'like');f.clear();assert.deepEqual(createFeedback(s).all(),[]);});
 test('card catalog uses stable ids, explicit concept origins and the requested scope',()=>{assert.equal(cards.length,14);assert.equal(new Set(cards.map(c=>c.id)).size,cards.length);assert.equal(cards.filter(c=>c.energy==='high').length,8);assert.equal(cards.filter(c=>c.energy==='low').length,6);for(const c of cards){assert(c.parent.includes('→'));assert(c.version>=1);assert(c.teaser&&c.trial&&c.more&&c.source);assert(!/游戏|个人项目/.test(c.type));if(c.link)assert(c.link.startsWith('https://'));}});
+
+test('large catalogs still produce at most fourteen cards per round',()=>{const many=Array.from({length:40},(_,i)=>({...cards[0],id:`item-${i}`}));const f=createFeed(many);let count=1;while(f.next())count++;assert.equal(count,14);});
