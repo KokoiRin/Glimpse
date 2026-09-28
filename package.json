@@ -1,0 +1,14 @@
+{
+  "name": "glimpse",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "A small, finite feed for curiosity and everyday exploration.",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "node scripts/serve.mjs",
+    "test": "node --test tests/*.test.mjs"
+  }
+}
