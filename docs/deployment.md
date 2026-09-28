@@ -45,4 +45,12 @@
 - Live backend: isolated temporary accounts, independent sessions of one account, like/dislike/clear, idempotent retry, rejected cross-account requests and unauthorized content writes. Temporary users were removed.
 - Live content publisher: temporary card created, updated, then unpublished without deploying code. Existing round retained its snapshot; a subsequent load read the update. Original 14 cards remain published.
 - Management key is only in ignored local .env.local with mode 600. Frontend uses the publishable key.
-- Google production audience and Pages delivery must be confirmed separately; localhost success alone does not establish public availability.
+- Google branding home/privacy URLs and basic scopes saved; OAuth audience is Production. Supabase disable_signup=true restricts Glimpse to its single existing owner account.
+- GitHub Pages deployment 36410431114 succeeded for c75ff76; live index/app/privacy matched the tested build. Production-site Google sign-in, sign-out and sign-in again succeeded after signups were disabled, with account status synced.
+
+## 当前登录范围
+
+当前仅供维护者本人登录。Supabase 的 `Allow new users to sign up` 已关闭，账号列表核对为唯一的本人 Google 账号；未登录访客仍可浏览并在本机保存记录。不要手工创建其他账号，以免扩大当前登录范围。
+
+以后明确需要开放时，再开启该注册开关。Google OAuth 已处于正式版，且只登记 openid、email、profile；实际能否进入 Glimpse 由 Supabase 的账号准入控制，不能只依赖 Google 测试用户名单。
+
