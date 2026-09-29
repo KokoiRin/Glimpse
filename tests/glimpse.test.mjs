@@ -11,18 +11,18 @@ import { createCatalog } from '../public/catalog.js';
 const appCode = readFileSync(resolve(root, 'app.js'), 'utf8').replace(/^import .*;$/gm, '').replace('export const ready','const ready');
 
 // Exercise the shipped controller with in-memory browser boundaries, not a copy of its rules.
-async function boot({blocked=false, saved, hidden=false}={}) {
- const nodes=new Map(), store=new Map(), handlers={}; let time=0;
+async function boot({blocked=false, saved, hidden=false,user=null}={}) {
+ const nodes=new Map(), store=new Map(), handlers={}; let time=0,changeUser;
  if(saved)store.set('rin-glimpse-events-v1',saved);
  const node=id=>{if(!nodes.has(id))nodes.set(id,{innerHTML:'',textContent:'',open:false,style:{},addEventListener(type,fn){if(type==='close')this.closeHandler=fn;else this[type]=fn;},attributes:{},setAttribute(key,value){this.attributes[key]=value;},classList:{toggle(){}},close(){this.open=false;this.closeHandler?.();},showModal(){this.open=true;},focus(){},scrollIntoView(){},replaceChildren(){this.innerHTML='';},querySelector(){return node('child');},querySelectorAll(){return [];}});return nodes.get(id);};
  const document={hidden,getElementById:node,querySelector:node,addEventListener(type,fn){handlers[type]=fn;}};
- const context={createRecords,createCatalog,createFeed,swipeDirection,__SUPABASE_URL__:'http://fixture.test',__SUPABASE_KEY__:'test-key',createCloud:()=>({fetchCards:async()=>cards,auth:{},records:{}}),initializeAuth:async({onUser})=>{onUser(null);return {};},document,performance:{now:()=>time},localStorage:{getItem:k=>{if(blocked)throw Error('blocked');return store.get(k)??null;},setItem:(k,v)=>{if(blocked)throw Error('blocked');store.set(k,v);},removeItem:k=>store.delete(k)},window:{scrollTo(){},addEventListener(type,fn){handlers[type]=fn;}},history:{replaceState(){},pushState(){},back(){}},location:{pathname:'/',href:'http://fixture.test/'},URL,Blob,Date,Math,console};
+ const context={createRecords,createCatalog,createFeed,swipeDirection,__SUPABASE_URL__:'http://fixture.test',__SUPABASE_KEY__:'test-key',createCloud:()=>({fetchCards:async()=>cards,auth:{signOut:async()=>({})},records:{list:async()=>[],apply:async()=>[]}}),initializeAuth:async({onUser})=>{changeUser=onUser;onUser(user);return {};},document,performance:{now:()=>time},localStorage:{getItem:k=>{if(blocked)throw Error('blocked');return store.get(k)??null;},setItem:(k,v)=>{if(blocked)throw Error('blocked');store.set(k,v);},removeItem:k=>store.delete(k)},window:{scrollTo(){},addEventListener(type,fn){handlers[type]=fn;}},history:{replaceState(){},pushState(){},back(){}},location:{pathname:'/',href:'http://fixture.test/'},URL,Blob,Date,Math,console};
  await vm.runInNewContext(appCode+'\nready',context);
- return {node,store,handlers,document,tick:n=>{time+=n;},events:()=>JSON.parse(store.get('rin-glimpse-events-v1')||'[]')};
+ return {node,store,handlers,document,setUser:u=>changeUser(u),tick:n=>{time+=n;},events:()=>JSON.parse(store.get('rin-glimpse-events-v1')||'[]')};
 }
-test('one round displays all fourteen cards without duplicates then stops',async()=>{
- const h=await boot();for(let i=0;i<14;i++)h.node('skip').click();
- const shown=h.events().filter(e=>e.action==='impression');assert.equal(shown.length,14);assert.equal(new Set(shown.map(e=>e.cardId)).size,14);assert.equal(h.events().at(-1).action,'deck_end');
+test('a guest round displays all six light cards without duplicates then stops',async()=>{
+ const h=await boot();for(let i=0;i<6;i++)h.node('skip').click();
+ const shown=h.events().filter(e=>e.action==='impression');assert.equal(shown.length,6);assert.equal(new Set(shown.map(e=>e.cardId)).size,6);assert(shown.every(e=>cards.find(c=>c.id===e.cardId).energy==='low'));assert.equal(h.events().at(-1).action,'deck_end');
 });
 test('controller handles returning to the same earlier and later cards',async()=>{
  const h=await boot();const a=h.events().at(-1).cardId;h.node('skip').click();const b=h.events().at(-1).cardId;h.node('previous').click();assert.equal(h.events().at(-1).cardId,a);h.node('skip').click();assert.equal(h.events().at(-1).cardId,b);
@@ -67,4 +67,29 @@ test('dragging from a card button suppresses its click without changing cards',a
  surface.pointerdown({button:0,pointerId:2,clientX:100,clientY:200,target:{closest:()=>({})}});
  surface.pointerup({pointerId:2,clientX:101,clientY:200});
  surface.click({preventDefault(){assert.fail('normal tap should work');},stopPropagation(){}});
+});
+
+const settle=()=>new Promise(resolve=>setImmediate(resolve));
+test('signed-in members get knowledge cards and can move light-only filtering into the menu',async()=>{
+ const h=await boot({user:{id:'a'}});assert.equal(h.node('relax').hidden,false);
+ assert.doesNotMatch(h.node('#main').innerHTML,/id="any"|id="low"/);
+ for(let i=0;i<14;i++)h.node('skip').click();
+ let shown=JSON.parse(h.store.get('glimpse-events-v2:a')).filter(e=>e.action==='impression');
+ assert.equal(shown.length,14);assert(shown.some(e=>cards.find(c=>c.id===e.cardId).energy==='high'));
+ h.node('relax').click();await settle();
+ for(let i=0;i<6;i++)h.node('skip').click();
+ shown=JSON.parse(h.store.get('glimpse-events-v2:a')).filter(e=>e.action==='impression').slice(14);
+ assert.equal(shown.length,6);assert(shown.every(e=>cards.find(c=>c.id===e.cardId).energy==='low'));
+});
+test('logout immediately clears member detail and cannot restore it through browser back',async()=>{
+ const h=await boot({user:{id:'a'}});h.node('open').click();
+ h.setUser(null);assert.doesNotMatch(h.node('#main').innerHTML,/class="trial"/);
+ h.handlers.popstate();await settle();
+ assert.equal(h.node('relax').hidden,true);
+ for(let i=0;i<6;i++)h.node('skip').click();
+ assert(h.events().filter(e=>e.action==='impression').every(e=>cards.find(c=>c.id===e.cardId).energy==='low'));
+});
+test('refreshing the same member session preserves the current round and detail',async()=>{
+ const h=await boot({user:{id:'a'}});h.node('open').click();const markup=h.node('#main').innerHTML;
+ h.setUser({id:'a'});await settle();assert.equal(h.node('#main').innerHTML,markup);
 });

@@ -1,5 +1,5 @@
 import {PGlite} from '@electric-sql/pglite';
-import {readFile} from 'node:fs/promises';
+import {readFile,readdir} from 'node:fs/promises';
 import {before,after,beforeEach,test} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -10,7 +10,8 @@ const card=batch.cards[0];
 before(async()=>{
  db=new PGlite();
  await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;grant usage on schema auth to anon,authenticated,service_role;grant execute on function auth.uid() to anon,authenticated,service_role;`);
- await db.exec(await readFile(new URL('../supabase/migrations/202609280001_glimpse.sql',import.meta.url),'utf8'));
+ const dir=new URL('../supabase/migrations/',import.meta.url);
+ for(const name of (await readdir(dir)).filter(n=>n.endsWith('.sql')).sort())await db.exec(await readFile(new URL(name,dir),'utf8'));
 });
 after(async()=>{await db?.close();});
 beforeEach(async()=>{
@@ -24,7 +25,9 @@ async function apply(uid,ops){return (await db.query('select public.apply_record
 test('anonymous visitors only read published cards and cannot publish or read personal records',async()=>{
  await db.query('update public.cards set published=false where id=$1',[card.id]);
  await as('anon',null,async()=>{
-  assert.equal((await db.query('select * from public.cards')).rows.length,13);
+  const rows=(await db.query('select * from public.cards')).rows;
+  assert.equal(rows.length,6);assert(rows.every(row=>row.payload.energy==='low'));
+  assert.equal((await db.query('select * from public.cards where id=$1',[card.id])).rows.length,0);
   await assert.rejects(db.query('select * from public.personal_records'),/permission denied/);
   await assert.rejects(db.query('select public.publish_card_batch($1)',[JSON.stringify(batch)]),/permission denied/);
   await assert.rejects(apply(A,[op('open')]),/permission denied/);
@@ -68,4 +71,10 @@ test('content edits require increased versions and initial seeds cannot overwrit
  await assert.rejects(db.query('select public.publish_card_batch($1)',[JSON.stringify(batch)]),/Increase version/);
  await assert.rejects(db.query('select public.publish_card_batch($1)',[JSON.stringify({cards:[{...changed,title:'未加版本'}],unpublish:[]})]),/Increase version/);
  assert.equal((await db.query('select payload from public.cards where id=$1',[card.id])).rows[0].payload.title,'新版');
+});
+
+test('members can read knowledge and light cards but never unpublished cards',async()=>{
+ await as('authenticated',A,async()=>{const rows=(await db.query('select * from public.cards')).rows;assert.equal(rows.length,14);assert(rows.some(r=>r.payload.energy==='high'));});
+ await db.query('update public.cards set published=false where id=$1',[card.id]);
+ await as('authenticated',A,async()=>assert.equal((await db.query('select * from public.cards')).rows.length,13));
 });

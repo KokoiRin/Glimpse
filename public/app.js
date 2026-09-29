@@ -8,7 +8,7 @@ import { createFeed, swipeDirection } from './navigation.js';
 const main = document.querySelector('#main');
 const dialog = document.querySelector('#about');
 let KEY = 'rin-glimpse-events-v1';
-let cards = [], roundRequest = 0, accountId = null;
+let cards = [], roundRequest = 0, accountId = null, booted = false;
 const dismissedMerges = new Set();
 const cloud = createCloud({url:__SUPABASE_URL__,key:__SUPABASE_KEY__,redirectTo:new URL('./',location.href).href});
 const menuDialog = document.querySelector('#menu-dialog');
@@ -21,7 +21,7 @@ let historyFilter = 'opened';
 const session = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
 let events = [], storageAvailable = true;
 try { const saved = JSON.parse(localStorage.getItem(KEY) ?? '[]'); events = Array.isArray(saved) ? saved.filter(e => e && typeof e.action === 'string').slice(-2000) : []; } catch { storageAvailable = false; }
-let energy = 'any', feed, current, view = 'feed', activeSince = performance.now(), elapsed = 0;
+let energy = 'low', feed, current, view = 'feed', activeSince = performance.now(), elapsed = 0;
 let pointerStart;
 const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const byId = id => document.getElementById(id);
@@ -50,7 +50,7 @@ async function startRound() {
  const request = ++roundRequest;
  view='loading';
  main.className='end-view'; main.innerHTML='<section class="end"><p role="status">正在准备这一轮内容…</p></section>';
- const loaded = await catalog.load();
+ const loaded = await catalog.load({userId:accountId});
  if(request !== roundRequest)return;
  cards = loaded.cards;
  byId('catalog-status').textContent = loaded.error ? (loaded.stale?'当前展示上次保存的内容。':'')+loaded.error : '';
@@ -81,11 +81,10 @@ function renderFeed() {
  const c=current;
  const known=feedback.get(c.id);
  pointerStart=null;
- main.innerHTML=`<div class="feed-toolbar"><h1 class="sr-only">Glimpse</h1><div class="energy" aria-label="内容强度"><button id="any" aria-pressed="${energy==='any'}">随便来</button><button id="low" aria-pressed="${energy==='low'}">轻松点</button></div></div><article class="card" aria-label="${escape(c.title.replace('\n',''))}"><div class="visual">${art(c)}</div><div class="card-content"><div class="meta"><span>${c.type}</span><span>${c.time}</span>${known?.opens?'<span>看过</span>':''}</div><p class="concept-path">${escape(c.parent)}</p><h2>${escape(c.title)}</h2><p class="teaser">${escape(c.teaser)}</p><button class="primary" id="open">${escape(c.action)} <span aria-hidden="true">↗</span></button></div><div class="card-tools"><button class="quiet arrow" id="previous" aria-label="上一张" ${feed.hasPrevious?'':'disabled'}>←</button>${feedbackControls()}<button class="quiet arrow" id="skip" aria-label="下一张">→</button></div></article>`;
+ main.innerHTML=`<div class="feed-toolbar"><h1 class="feed-brand">Glimpse</h1><span class="feed-caption">${energy==='low'?'随手放松一下':'一点好奇，一点留白'}</span></div><article class="card" aria-label="${escape(c.title.replace('\n',''))}"><div class="visual">${art(c)}</div><div class="card-content"><div class="meta"><span>${c.type}</span><span>${c.time}</span>${known?.opens?'<span>看过</span>':''}</div><p class="concept-path">${escape(c.parent)}</p><h2>${escape(c.title)}</h2><p class="teaser">${escape(c.teaser)}</p><button class="primary" id="open">${escape(c.action)} <span aria-hidden="true">↗</span></button></div><div class="card-tools"><button class="quiet arrow" id="previous" aria-label="上一张" ${feed.hasPrevious?'':'disabled'}>←</button>${feedbackControls()}<button class="quiet arrow" id="skip" aria-label="下一张">→</button></div></article>`;
  bindFeedback();
  on('open',()=>{feedback.open(c);record('open');view='trial';history.pushState({trial:true},'','#try');renderTrial();focusHeading();});
  on('skip',nextCard); on('previous',previousCard);
- for(const mode of ['any','low']) on(mode,()=>{if(energy===(mode==='any'?'any':'low'))return;record('context_change',{to:mode});energy=mode;startRound();});
  const surface=main.querySelector('.card');
  let suppressClick=false;
  surface.addEventListener('pointerdown', event => {
@@ -164,7 +163,7 @@ function renderRecords() {
   on(`unrate-${row.id}`,()=>{feedback.rate(card||row,null);renderRecords();});
   on(`record-${row.id}`,()=>{
    if(!card)return;
-   energy='any';feed=createFeed(cards,{firstId:card.id});current=feed.current;
+   energy=accountId?'any':'low';refreshAccountUI();feed=createFeed(cards,{firstId:card.id});current=feed.current;
    historyDialog.close();feedback.open(current);record('open',{from:'records'});
    if(view!=='trial')history.pushState({trial:true},'','#try');view='trial';renderTrial();focusHeading();
   });
@@ -175,7 +174,7 @@ function end() {
  if(view!=='end')record('deck_end',{from:view});
  main.className='end-view';
  view='end'; history.replaceState(null,'',location.pathname);
- main.innerHTML=`<section class="end"><div class="symbol" aria-hidden="true">✳</div><p class="eyebrow">留白也是一种选择</p><h2>${cards.length?'这几张，先到这里。':'暂时没有可浏览的内容。'}</h2><p>这轮可看的卡片到这里了。也可以从右上角菜单里的“我的记录”找回之前的内容。<br>现在可以直接关掉这一页。</p>${feed.current?'<button class="quiet" id="return-last">← 回看最后一张</button><br>':''}<button class="secondary" id="restart">再随便看看 ↗</button></section>`;
+ main.innerHTML=`<section class="end"><div class="symbol" aria-hidden="true">✳</div><p class="eyebrow">留白也是一种选择</p><h2>${cards.length?'这几张，先到这里。':'暂时没有可浏览的内容。'}</h2><p>这轮可看的卡片到这里了。也可以从右上角菜单里的“我的记录”找回之前的内容。<br>现在可以直接关掉这一页。</p>${feed?.current?'<button class="quiet" id="return-last">← 回看最后一张</button><br>':''}<button class="secondary" id="restart">再随便看看 ↗</button></section>`;
  on('restart',()=>{startRound();focusHeading();});on('return-last',()=>{showCard(true);focusHeading();});focusHeading();
 }
 window.addEventListener('keydown',event=>{
@@ -223,6 +222,10 @@ function refreshAccountUI() {
  byId('login').hidden=!!user;
  byId('logout').hidden=!user;
  byId('sync').hidden=!user;
+ byId('relax').hidden=!user;
+ byId('relax').setAttribute('aria-pressed',String(energy==='low'));
+ byId('relax').textContent=energy==='low'?'加入知识卡':'只看轻松内容';
+ byId('content-scope').textContent=user?'计算机、数学与轻松内容，都在这里。':'无需登录，可以浏览全部轻松内容。';
  byId('guest-merge').hidden=!feedback.hasGuestRecords || dismissedMerges.has(user?.id);
  byId('records-note').textContent=user?'看过和评价保存在你的账号中；点开不等于喜欢。':'记录目前保存在本机，登录后可以选择合并到账号。';
  byId('clear').textContent=user?'清除本机缓存':'清除本机记录';
@@ -237,7 +240,13 @@ function refreshAccountUI() {
 }
 function changeUser(user) {
  const next=user?.id ?? null;
- if(next!==accountId) {
+ const changed=next!==accountId;
+ if(changed) {
+  ++roundRequest;view='loading';cards=[];current=null;feed=null;
+  main.className='end-view';main.innerHTML='<section class="end"><p role="status">正在准备内容…</p></section>';
+  byId('sources').replaceChildren();historyDialog.close();dialog.close();
+  history.replaceState(null,'',location.pathname);
+  energy=next?'any':'low';
   accountId=next;
   byId('export-preview').replaceChildren();
   if(exportUrl){URL.revokeObjectURL(exportUrl);exportUrl=null;}
@@ -246,6 +255,7 @@ function changeUser(user) {
  }
  feedback.setUser(user);
  void feedback.sync();
+ if(changed && booted)void startRound();
 }
 on('login',async()=>{
  if(!cloud){byId('account-status').textContent='登录尚未配置，请稍后重试。';return;}
@@ -269,6 +279,11 @@ on('merge',async()=>{
 });
 on('merge-later',()=>{dismissedMerges.add(feedback.user?.id);refreshAccountUI();});
 on('retry-content',()=>{void startRound();});
+on('relax',()=>{
+ if(!accountId)return;
+ energy=energy==='low'?'any':'low';record('context_change',{to:energy});
+ menuDialog.close();refreshAccountUI();void startRound();
+});
 
 async function boot() {
  refreshAccountUI();
@@ -280,6 +295,7 @@ async function boot() {
  }
  // The callback has been handled; a reload starts a new, finite visit.
  history.replaceState(null,'',location.pathname);
+ booted=true;
  await startRound();
 }
 export const ready = boot();

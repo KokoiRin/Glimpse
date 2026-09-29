@@ -3,14 +3,14 @@
 ## Supabase
 
 1. 在自己的组织中创建 Glimpse 项目，关闭自动向访客开放新表。
-2. 在 SQL Editor 执行 `supabase/migrations/202609280001_glimpse.sql`。这是首次迁移；不要对已有同名表直接重复执行。
+2. 首次部署按文件名顺序执行 `supabase/migrations/` 中的 SQL。已有项目只执行尚未应用的迁移，不重复创建表。`202609290001_guest_content.sql` 将游客读取限制为已发布的 `energy=low` 内容。
 3. Auth 启用 Google。生产 Site URL 为 `https://kokoirin.github.io/Glimpse/`；Redirect URLs 精确加入该地址和 `http://localhost:4173/Glimpse/`。保留需要的本地测试地址，不使用通配的外部回跳地址。
-4. 不启用其他注册方式。访客无须创建匿名账号，可以直接读取已发布卡片。
+4. 不启用其他注册方式。访客无须创建匿名账号，可以直接读取已发布的轻松卡片。
 5. 把 Project URL 和 publishable key 填入本地 `.env.local`，并作为同名 GitHub Actions repository variables 配置：`GLIMPSE_SUPABASE_URL`、`GLIMPSE_SUPABASE_PUBLISHABLE_KEY`。
 6. 本地批量发布使用 `.env.local` 中的 `SUPABASE_SECRET_KEY`（或旧项目的 `SUPABASE_SERVICE_ROLE_KEY`）。只保存在受限的本地环境文件，不放进 GitHub、浏览器或构建变量。
 7. 校验并手动发布 `content/initial-cards.json` 一次。以后只发布需要修改的批次。
 
-已发布卡片允许访客读取；草稿不开放。个人表只允许当前账号读取，修改通过校验登录身份的函数执行。重试去重表不对浏览器开放。RPC 的用户参数必须与认证身份一致，防止切换账号时旧请求误写新账号。
+已发布的轻松卡片允许访客读取；领域知识只向已登录账号开放；草稿不开放。个人表只允许当前账号读取，修改通过校验登录身份的函数执行。重试去重表不对浏览器开放。RPC 的用户参数必须与认证身份一致，防止切换账号时旧请求误写新账号。
 
 ## Google Auth Platform
 
@@ -54,3 +54,11 @@
 
 以后明确需要开放时，再开启该注册开关。Google OAuth 已处于正式版，且只登记 openid、email、profile；实际能否进入 Glimpse 由 Supabase 的账号准入控制，不能只依赖 Google 测试用户名单。
 
+
+## 内容范围更新（2026-09-29）
+
+- 已应用 `202609290001_guest_content.sql`：anon 只能读已发布 low 卡片，authenticated 可以读全部已发布卡片。未改动账号准入和个人数据权限。
+- 已事务发布 `content/2026-09-29-exploration.json` 的 14 张新卡片。数据库核对 high 16、low 12，共 28 张；公开接口验证仅返回 12 张 low，包括 3 张心理学卡。
+- 手机尺寸 390×844 验证游客菜单、有限卡组。发布前已开始的一轮仍为 6 张，下一轮读到 12 张，含全部新增心理学卡。
+- 内容缓存按游客或账号隔离；旧缓存用于游客时只保留 low。退出或账号切换立即清除当前卡片及详情并重新取内容；同账号续期不打乱当前轮。
+- 顶部模式按钮移除。登录用户在菜单切换只看轻松内容；默认加入领域知识。本版仍为有限随机探索，不声称已实现个性化推荐算法。

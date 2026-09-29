@@ -1,0 +1,355 @@
+{
+  "cards": [
+    {
+      "id": "kotlin-equality",
+      "version": 1,
+      "type": "计算机 · Kotlin",
+      "topic": "kotlin",
+      "parent": "对象 → 相等与同一",
+      "energy": "high",
+      "time": "1 分钟",
+      "art": "state",
+      "title": "看起来一样，\n就是同一个东西吗？",
+      "teaser": "两个内容一样的笔记本，可以是同一本，也可以各有一本。程序里的“相等”也有两层。",
+      "action": "打开看看",
+      "trialTitle": "看起来一样，就是同一个东西吗？",
+      "trial": "想象 Kotlin 中有 data class Note(val text: String)。\n\n分别创建 a = Note(\"今天\") 和 b = Note(\"今天\")。a == b 是 true，而 a === b 是 false。",
+      "moreTitle": "再看一层",
+      "more": "== 会按 equals 的规则比较；这个 data class 自动生成的 equals 比较主构造函数中的属性。=== 问的是两边是否指向同一个对象。\n\n普通类如果没有重写 equals，默认仍按对象身份比较，所以不能把 == 一概理解为“逐个比较所有属性”。",
+      "source": "Kotlin 官方文档：Equality。示例为本卡编写。",
+      "link": "https://kotlinlang.org/docs/equality.html",
+      "linkLabel": "接着看：内容来源",
+      "choices": [
+        {
+          "label": "如果 c = a 呢？",
+          "reply": "c 和 a 指向同一个对象，c === a 为 true。赋值一个引用没有复制出第二个对象。"
+        }
+      ]
+    },
+    {
+      "id": "kotlin-shallow-copy",
+      "version": 1,
+      "type": "计算机 · Kotlin",
+      "topic": "kotlin",
+      "parent": "data class → 浅拷贝",
+      "energy": "high",
+      "time": "1 分钟",
+      "art": "graph",
+      "title": "复制了一份，\n为什么原件也变了？",
+      "teaser": "copy() 复制了外壳，却可能仍共用里面那个可变列表。",
+      "action": "打开看看",
+      "trialTitle": "复制了一份，为什么原件也变了？",
+      "trial": "假设 data class Bag(val items: MutableList<String>)。\n\na 的 items 是 [\"书\"]，b = a.copy()。现在往 b.items 加入“笔”：a.items 也会看到“笔”。",
+      "moreTitle": "再看一层",
+      "more": "data class 的 copy() 是浅拷贝：新建 Bag，但默认沿用原属性的值。items 是一个列表引用，因此两个 Bag 指向同一个列表。\n\nb = a.copy(items = a.items.toMutableList()) 可以在这个字符串列表的例子里分开列表。若列表元素本身也是可变对象，复制列表仍不会递归复制那些元素。",
+      "source": "Kotlin 官方文档：Data classes / Copying。",
+      "link": "https://kotlinlang.org/docs/data-classes.html",
+      "linkLabel": "接着看：内容来源",
+      "choices": [
+        {
+          "label": "所以 a 和 b 是同一个对象？",
+          "reply": "不是。Bag 是两个对象；它们里面的 items 引用却指向同一个列表。外壳分开，内部仍可共享。"
+        }
+      ]
+    },
+    {
+      "id": "coroutine-cancel-check",
+      "version": 1,
+      "type": "计算机 · 协程",
+      "topic": "concurrency",
+      "parent": "协程 → 取消协作",
+      "energy": "high",
+      "time": "1 分钟",
+      "art": "queue",
+      "title": "已经点了取消，\n工作怎么还没停？",
+      "teaser": "取消通常是一个需要被工作代码注意到的信号。",
+      "action": "打开看看",
+      "trialTitle": "已经点了取消，工作怎么还没停？",
+      "trial": "想象一个协程一直在算数：while 循环没有挂起，也不检查状态。外面调用 cancel()，并不等于强行在某条指令中间把它切断。",
+      "moreTitle": "再看一层",
+      "more": "Kotlin 协程的取消是协作式的。可取消的挂起函数会响应取消；长时间计算的循环也可以定期用 ensureActive() 检查，或以 isActive 控制继续执行。\n\n仅给函数加 suspend，并不会自动让它的每一步都能响应取消。检查之间的一大段计算仍可能让停止变慢。",
+      "source": "Kotlin kotlinx.coroutines 官方指南：Cancellation and timeouts。",
+      "link": "https://github.com/Kotlin/kotlinx.coroutines/blob/master/docs/topics/coroutines-cancellation.md",
+      "linkLabel": "接着看：内容来源",
+      "choices": [
+        {
+          "label": "像收到“收工”消息？",
+          "reply": "可以这样理解：消息已到，但正在干活的人还需要有机会检查消息，并走到停止的位置。"
+        }
+      ]
+    },
+    {
+      "id": "http-idempotent-retry",
+      "version": 1,
+      "type": "计算机 · 网络",
+      "topic": "network",
+      "parent": "网络重试 → 幂等",
+      "energy": "high",
+      "time": "1 分钟",
+      "art": "state",
+      "title": "按钮点了两次，\n会下两次单吗？",
+      "teaser": "第一次请求可能已成功，只是“成功”的答复没回来。",
+      "action": "打开看看",
+      "trialTitle": "按钮点了两次，会下两次单吗？",
+      "trial": "客户端超时，不能证明服务器没有处理请求。再发一次，如果每次都“新增一张订单”，就可能出现两张订单。",
+      "moreTitle": "再看一层",
+      "more": "幂等说的是：重复同一个请求，预期的服务器效果与执行一次相同。例如把某资源设置成一个确定值，与每次增加 1 不同。\n\nHTTP 的 PUT 被定义为幂等方法，POST 本身没有这个保证。订单接口可以另外约定操作 ID 并去重，让同一笔操作的重试不会重复创建订单。幂等也不要求每次返回完全相同的响应或日志。",
+      "source": "RFC 9110 §9.2.2：Idempotent Methods；订单去重为应用示例。",
+      "link": "https://www.rfc-editor.org/rfc/rfc9110.html#section-9.2.2",
+      "linkLabel": "接着看：内容来源",
+      "choices": [
+        {
+          "label": "换一个操作 ID 再试呢？",
+          "reply": "服务端可能把它视作新操作。想重试同一笔操作，应沿用它的 ID，并遵守接口约定。"
+        }
+      ]
+    },
+    {
+      "id": "pigeonhole-months",
+      "version": 1,
+      "type": "数学 · 计数",
+      "topic": "counting",
+      "parent": "分类 → 抽屉原理",
+      "energy": "high",
+      "time": "1 分钟",
+      "art": "math",
+      "title": "13 个人里，\n一定有两人同月生日？",
+      "teaser": "不知道任何人的生日，也能先确定一件事。",
+      "action": "打开看看",
+      "trialTitle": "13 个人里，一定有两人同月生日？",
+      "trial": "把 12 个月看成 12 个抽屉，每个人按出生月份放进一个抽屉。13 个人不可能让每个抽屉最多只有一个人。",
+      "moreTitle": "再看一层",
+      "more": "所以至少有一个月份有两个人生日。这不需要假设生日均匀分布，也不需要知道具体是哪两个人。\n\n它保证的是“同月”，不是“同一天”。抽屉原理的力量在于：有时不用逐个寻找，也能证明某种重复必然存在。",
+      "source": "Wolfram MathWorld：Pigeonhole Principle；月份示例为本卡编写。",
+      "link": "https://mathworld.wolfram.com/PigeonholePrinciple.html",
+      "linkLabel": "接着看：内容来源",
+      "choices": [
+        {
+          "label": "只有 12 个人呢？",
+          "reply": "可能同月，也可能每人恰好各占一个月；此时不能保证发生重复。"
+        }
+      ]
+    },
+    {
+      "id": "geometric-half",
+      "version": 1,
+      "type": "数学 · 无穷",
+      "topic": "series",
+      "parent": "不断减半 → 等比级数",
+      "energy": "high",
+      "time": "1 分钟",
+      "art": "math",
+      "title": "永远加下去，\n结果也能有限？",
+      "teaser": "半块、四分之一块、八分之一块……每次只拿剩下的一半。",
+      "action": "打开看看",
+      "trialTitle": "永远加下去，结果也能有限？",
+      "trial": "把一整块巧克力看成 1。先取 1/2，再取 1/4，再取 1/8。拿的次数越来越多，但总量始终不到一整块。",
+      "moreTitle": "再看一层",
+      "more": "拿 n 次后的总量是 1 − 1/2ⁿ，剩下 1/2ⁿ。n 越大，剩下的量就能小到低于你指定的任意正数。\n\n因此无穷级数 1/2 + 1/4 + 1/8 + … 的和是 1。这里的“和”是有限部分和的极限，并不是某一次有限操作突然把最后一点拿走。",
+      "source": "Wolfram MathWorld：Geometric Series；巧克力示例为本卡编写。",
+      "link": "https://mathworld.wolfram.com/GeometricSeries.html",
+      "linkLabel": "接着看：内容来源",
+      "choices": [
+        {
+          "label": "拿 3 次，还剩多少？",
+          "reply": "拿走 1/2 + 1/4 + 1/8 = 7/8，还剩 1/8。有限次数和无限极限要分开看。"
+        }
+      ]
+    },
+    {
+      "id": "dice-given-even",
+      "version": 1,
+      "type": "数学 · 概率",
+      "topic": "probability",
+      "parent": "新信息 → 条件概率",
+      "energy": "high",
+      "time": "1 分钟",
+      "art": "math",
+      "title": "知道骰子是偶数，\n掷到 6 的机会变了吗？",
+      "teaser": "骰子没重新掷，新的信息却改变了你该考虑的范围。",
+      "action": "打开看看",
+      "trialTitle": "知道骰子是偶数，掷到 6 的机会变了吗？",
+      "trial": "一颗公平六面骰已经掷好，结果暂时遮住。你只被告知“结果是偶数”。在这个条件下，结果为 6 的概率是多少？",
+      "moreTitle": "再看一层",
+      "more": "原本有 1 到 6 六个等可能结果。知道是偶数后，只剩 2、4、6 三个等可能结果，所以条件概率是 1/3。\n\n不是骰子过去的结果被改变了，而是你用来判断的可能范围变了。这里假设告知规则就是如实报告是否为偶数，没有额外的挑选规则。",
+      "source": "Wolfram MathWorld：Conditional Probability；公平骰子示例为本卡编写。",
+      "link": "https://mathworld.wolfram.com/ConditionalProbability.html",
+      "linkLabel": "接着看：内容来源",
+      "choices": [
+        {
+          "label": "1/6",
+          "reply": "这是还不知道“偶数”之前的概率。新信息排除了三个奇数结果。"
+        },
+        {
+          "label": "1/3",
+          "reply": "对，在给定条件下，2、4、6 各占三分之一。"
+        }
+      ]
+    },
+    {
+      "id": "chessboard-color",
+      "version": 1,
+      "type": "数学 · 证明",
+      "topic": "invariants",
+      "parent": "拼图 → 不变量",
+      "energy": "high",
+      "time": "1 分钟",
+      "art": "math",
+      "title": "少了两格的棋盘，\n为什么怎么铺都不行？",
+      "teaser": "有时候不用试完所有摆法，数一数颜色就够了。",
+      "action": "打开看看",
+      "trialTitle": "少了两格的棋盘，为什么怎么铺都不行？",
+      "trial": "一块 8×8 黑白交替的棋盘，去掉左上角和右下角两个格子。剩下 62 格，能用 31 块覆盖相邻两格的 1×2 骨牌，完整铺满而不重叠吗？",
+      "moreTitle": "再看一层",
+      "more": "不能。两个对角格是同一种颜色，去掉后两种颜色的格数变成 30 和 32。\n\n每块骨牌无论横放还是竖放，都恰好覆盖一黑一白。31 块一定覆盖 31 黑和 31 白，与剩下的数量不符。面积对得上，还不够；颜色数量给出了更强的限制。",
+      "source": "Jeremy Avigad：A formalization of the mutilated chessboard problem。",
+      "link": "https://www.andrew.cmu.edu/user/avigad/Papers/mutilated.pdf",
+      "linkLabel": "接着看：内容来源",
+      "choices": [
+        {
+          "label": "换个方向摆会有用吗？",
+          "reply": "横放和竖放都覆盖一黑一白。正是这件不随摆法改变的事，让我们可以跳过逐个尝试。"
+        }
+      ]
+    },
+    {
+      "id": "psych-framing",
+      "version": 1,
+      "type": "心理学 · 日常观察",
+      "topic": "psychology",
+      "parent": "措辞 → 框架效应",
+      "energy": "low",
+      "time": "1 分钟",
+      "art": "outside",
+      "title": "“还剩 20 分钟”，\n听起来是多还是少？",
+      "teaser": "“还有 20 分钟”和“只剩 20 分钟”，时间一样，语气却不一样。",
+      "action": "打开看看",
+      "trialTitle": "“还剩 20 分钟”，听起来是多还是少？",
+      "trial": "轻轻读一遍这两句：\n\n“我们还有 20 分钟。”\n“我们只剩 20 分钟。”\n\n哪句让你更想慢慢做，哪句更像在催你？没有标准答案。",
+      "moreTitle": "再看一层",
+      "more": "研究中的框架效应指：对同一决策问题的不同表述，可能改变人的偏好。上面的时间句子是日常类比，并不是原实验，也不能预测你的反应。\n\n可以只留意一个小地方：一句话里，事实是什么，强调的角度又是什么？",
+      "source": "Tversky 与 Kahneman（1981）：The framing of decisions and the psychology of choice；本卡为原创日常类比。",
+      "link": "https://doi.org/10.1126/science.7455683",
+      "linkLabel": "接着看：内容来源",
+      "choices": [
+        {
+          "label": "我觉得差不多",
+          "reply": "也完全可以。表达可能影响感受，不代表每个人、每个场景都会发生同样的变化。"
+        }
+      ]
+    },
+    {
+      "id": "psych-availability",
+      "version": 1,
+      "type": "心理学 · 日常观察",
+      "topic": "psychology",
+      "parent": "记忆 → 可得性",
+      "energy": "low",
+      "time": "1 分钟",
+      "art": "coffee",
+      "title": "想得起来的事，\n就真的更常见吗？",
+      "teaser": "刚听完几个旅行延误的故事，“最近是不是总延误”就很容易冒出来。",
+      "action": "打开看看",
+      "trialTitle": "想得起来的事，就真的更常见吗？",
+      "trial": "想起最近一个特别鲜明的故事就好，不需要说出来。\n\n如果要判断类似事情有多常见，你会先想到统计，还是先想到那个画面？",
+      "moreTitle": "再看一层",
+      "more": "可得性启发式是指，人有时会借助例子进入脑海的容易程度来判断频率或可能性。鲜明、容易想起的故事，未必能代表总体。\n\n这不等于故事不真实。只是“我容易想起几件”和“全部事情里占多少”，回答的是不同问题。",
+      "source": "Tversky 与 Kahneman（1973）：Availability: A heuristic for judging frequency and probability。",
+      "link": "https://www.sciencedirect.com/science/article/pii/0010028573900339",
+      "linkLabel": "接着看：内容来源",
+      "choices": [
+        {
+          "label": "今天不想分析",
+          "reply": "那就只留住那个故事。不必把每个生活瞬间都变成分析练习。"
+        }
+      ]
+    },
+    {
+      "id": "psych-familiarity",
+      "version": 1,
+      "type": "心理学 · 日常观察",
+      "topic": "psychology",
+      "parent": "熟悉 → 单纯曝光",
+      "energy": "low",
+      "time": "1 分钟",
+      "art": "rain",
+      "title": "一首歌听多了，\n会慢慢顺耳吗？",
+      "teaser": "第一次听没感觉，后来却在路上哼了起来。熟悉，有时也会参与喜欢。",
+      "action": "打开看看",
+      "trialTitle": "一首歌听多了，会慢慢顺耳吗？",
+      "trial": "想想有没有某首歌，最初不觉得特别，后来却慢慢熟悉了。\n\n也可能正好相反：一首喜欢的歌循环太多次，暂时不想再听。这两种经历都不奇怪。",
+      "moreTitle": "再看一层",
+      "more": "单纯曝光研究关注：在一些条件下，反复接触某个刺激，本身就可能提高对它的好感。\n\n它不是“重复越多越喜欢”的保证；本卡的音乐情境只是日常联想，不是对音乐偏好的实验结论。你可以熟悉而不喜欢，也可以喜欢新鲜事物。",
+      "source": "Robert B. Zajonc：The Attitudinal Effects of Mere Exposure，密歇根大学 ISR 历史报告。",
+      "link": "https://cdn.isr.umich.edu/pubFiles/historicPublications/Theattitudinaleffects_2360_.PDF",
+      "linkLabel": "接着看：内容来源",
+      "choices": [
+        {
+          "label": "想到一首了",
+          "reply": "可以在心里放一小段，然后继续走。不用记歌名，也不用解释为什么。"
+        }
+      ]
+    },
+    {
+      "id": "evening-bakery",
+      "version": 1,
+      "type": "生活 · 小场景",
+      "topic": "everyday",
+      "parent": "街道 → 傍晚的光",
+      "energy": "low",
+      "time": "1 分钟",
+      "art": "outside",
+      "title": "拐角的面包店，\n还亮着一小块灯。",
+      "teaser": "天色在变暗，玻璃里面却是一种温热的黄。",
+      "action": "打开看看",
+      "trialTitle": "拐角的面包店，还亮着一小块灯。",
+      "trial": "想象你路过一家快打烊的面包店。托盘已经空了一半，柜台上还有一点面包屑。\n\n你不急着进去，也没有一定要买的东西。就在门外站一会儿。",
+      "moreTitle": "再看一层",
+      "more": "店里有人把最后几只纸袋叠好。你转身继续往前走，那块黄色的光留在身后。\n\n这个场景到这里就可以结束。",
+      "source": "Glimpse 原创虚构生活场景，没有任务或练习目标。",
+      "choices": [
+        {
+          "label": "继续往前走",
+          "reply": "好，路的下一段还没开始。"
+        }
+      ]
+    },
+    {
+      "id": "cup-steam",
+      "version": 1,
+      "type": "生活 · 小停顿",
+      "topic": "everyday",
+      "parent": "桌面 → 一缕热气",
+      "energy": "low",
+      "time": "1 分钟",
+      "art": "coffee",
+      "title": "杯口那点热气，\n没有固定的形状。",
+      "teaser": "它刚像一条线，又很快散开了。",
+      "action": "打开看看",
+      "trialTitle": "杯口那点热气，没有固定的形状。",
+      "trial": "想象桌上放着一杯温热的饮品。光从旁边照过来，杯口偶尔能看见一缕热气。\n\n不需要盯着，也不需要刻意调整呼吸。只是在这一小段文字里坐一下。",
+      "moreTitle": "再看一层",
+      "more": "有人从旁边走过，空气动了一下。刚才的线已经不见了，杯子还在原处。\n\n没有什么需要完成。想离开时，直接翻到下一张。",
+      "source": "Glimpse 原创虚构生活场景，不作身心效果承诺。"
+    },
+    {
+      "id": "one-color-walk",
+      "version": 1,
+      "type": "生活 · 随手看看",
+      "topic": "everyday",
+      "parent": "身边 → 一点颜色",
+      "energy": "low",
+      "time": "1 分钟",
+      "art": "outside",
+      "title": "今天的绿色，\n可能藏在哪儿？",
+      "teaser": "一片叶子、一个杯沿，或者窗外很远的一块招牌。",
+      "action": "打开看看",
+      "trialTitle": "今天的绿色，可能藏在哪儿？",
+      "trial": "如果愿意，可以从身边随手找一处绿色。找不到也没关系，想起一种绿色就好。\n\n不拍照、不记录，只看这一眼。",
+      "moreTitle": "再看一层",
+      "more": "同样叫绿色，有的偏灰，有的像透过光的叶子。你刚才看见的是哪一种，可以只留给自己。\n\n这不是观察力测试，也没有找齐几种颜色的要求。",
+      "source": "Glimpse 原创生活观察邀请；不采集你的观察内容。"
+    }
+  ],
+  "unpublish": []
+}

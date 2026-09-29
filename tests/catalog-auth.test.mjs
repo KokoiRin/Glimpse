@@ -8,15 +8,15 @@ const cards=JSON.parse(readFileSync(new URL('../content/initial-cards.json',impo
 function storage(){const map=new Map();return {getItem:k=>map.get(k)||null,setItem:(k,v)=>map.set(k,v)};}
 test('catalog changes appear on the next load and do not mutate an existing round',async()=>{
  let published=cards;const catalog=createCatalog({storage:storage(),fetchCards:async()=>published});
- const first=await catalog.load();published=[{...cards[0],version:2,title:'新版'}];const second=await catalog.load();
+ const first=await catalog.load({userId:'a'});published=[{...cards[0],version:2,title:'新版'}];const second=await catalog.load({userId:'a'});
  assert.equal(first.cards.length,14);assert.notEqual(first.cards[0].title,'新版');assert.equal(second.cards[0].title,'新版');
 });
 test('failed loads use last successful cache, including an authoritative empty catalog',async()=>{
  let fail=false,published=cards;const s=storage(),catalog=createCatalog({storage:s,fetchCards:async()=>{if(fail)throw Error();return published;}});
- await catalog.load();fail=true;assert.equal((await catalog.load()).cards.length,14);
- fail=false;published=[];assert.equal((await catalog.load()).cards.length,0);
- fail=true;assert.equal((await catalog.load()).cards.length,0);
- const reread=createCatalog({storage:s,fetchCards:async()=>{throw Error();}});assert.deepEqual((await reread.load()).cards,[]);
+ await catalog.load({userId:'a'});fail=true;assert.equal((await catalog.load({userId:'a'})).cards.length,14);
+ fail=false;published=[];assert.equal((await catalog.load({userId:'a'})).cards.length,0);
+ fail=true;assert.equal((await catalog.load({userId:'a'})).cards.length,0);
+ const reread=createCatalog({storage:s,fetchCards:async()=>{throw Error();}});assert.deepEqual((await reread.load({userId:'a'})).cards,[]);
 });
 test('first failed load has a retryable error and no invented cards',async()=>{const result=await createCatalog({storage:storage(),fetchCards:async()=>{throw Error();}}).load();assert(result.error);assert.equal(result.stale,false);assert.deepEqual(result.cards,[]);});
 test('publisher rejects duplicate ids, unsupported widgets and executable links before publishing',()=>{
@@ -38,4 +38,24 @@ test('cancelled Google login removes the error parameters and leaves guest acces
 test('cancelled login errors in the URL fragment are reported and removed',async()=>{
  const auth={getSession:async()=>({data:{session:null}}),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}})};
  const result=await initializeAuth({auth,url:'https://example.com/Glimpse/#error=access_denied&error_description=cancelled',replaceUrl:url=>assert.equal(url,'/Glimpse/'),onUser:u=>assert.equal(u,null)});assert(result.error);
+});
+
+test('guests only receive light cards even from a mixed response or old cache',async()=>{
+ const s=storage();s.setItem('glimpse-catalog-v1',JSON.stringify(cards));
+ const offline=createCatalog({storage:s,fetchCards:async()=>{throw Error();}});
+ const old=await offline.load();assert.equal(old.cards.length,6);assert(old.cards.every(c=>c.energy==='low'));
+ const online=await createCatalog({storage:s,fetchCards:async()=>cards}).load();
+ assert.equal(online.cards.length,6);assert(online.cards.every(c=>c.energy==='low'));
+});
+test('offline logout and account switch cannot reuse the preceding account catalog',async()=>{
+ let fail=false;const s=storage(),catalog=createCatalog({storage:s,fetchCards:async()=>{if(fail)throw Error();return cards;}});
+ await catalog.load({userId:'a'});fail=true;
+ assert.equal((await catalog.load()).cards.length,0);
+ assert.equal((await catalog.load({userId:'b'})).cards.length,0);
+ assert.equal((await catalog.load({userId:'a'})).cards.length,14);
+});
+test('an in-flight member response stays in its captured cache scope',async()=>{
+ let finish;const s=storage(),catalog=createCatalog({storage:s,fetchCards:()=>new Promise(resolve=>finish=resolve)});
+ const request=catalog.load({userId:'a'});finish(cards);await request;
+ assert.equal(s.getItem('glimpse-catalog-v2:guest'),null);
 });
