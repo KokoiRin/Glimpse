@@ -14,6 +14,7 @@ export function createFeedback(storage, key = 'glimpse-records-v1') {
         reaction: ['like', 'dislike'].includes(row.reaction) ? row.reaction : null,
         lastOpenedAt: typeof row.lastOpenedAt === 'string' ? row.lastOpenedAt : null,
         ratedAt: typeof row.ratedAt === 'string' ? row.ratedAt : null,
+        seenAt: typeof row.seenAt === 'string' ? row.seenAt : (row.lastOpenedAt || row.ratedAt || null),
       };
     }
   } catch { available = false; }
@@ -22,17 +23,18 @@ export function createFeedback(storage, key = 'glimpse-records-v1') {
     catch { available = false; }
   }
   function entry(card) {
-    const old = records[card.id] || { opens: 0, reaction: null, lastOpenedAt: null, ratedAt: null };
+    const old = records[card.id] || { opens: 0, reaction: null, lastOpenedAt: null, ratedAt: null, seenAt: null };
     return records[card.id] = { ...old, id: card.id, title: card.title, topic: card.topic, parent: card.parent, version: card.version };
   }
   return {
     get available() { return available; },
     get(id) { return records[id] ? { ...records[id] } : undefined; },
     all() { return Object.values(records).map(row => ({ ...row })); },
-    open(card) { const row = entry(card); row.opens++; row.lastOpenedAt = new Date().toISOString(); save(); },
+    see(card, at = new Date().toISOString()) { const row = entry(card); if (!row.seenAt) { row.seenAt = at; save(); } },
+    open(card) { const row = entry(card); row.opens++; row.lastOpenedAt = new Date().toISOString(); row.seenAt ||= row.lastOpenedAt; save(); },
     rate(card, reaction) {
       if (![null, 'like', 'dislike'].includes(reaction)) throw new Error('Unknown reaction');
-      const row = entry(card); row.reaction = reaction; row.ratedAt = new Date().toISOString(); save();
+      const row = entry(card); row.reaction = reaction; row.ratedAt = new Date().toISOString(); row.seenAt ||= row.ratedAt; save();
     },
     clear() {
       records = Object.create(null);

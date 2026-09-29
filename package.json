@@ -13,13 +13,18 @@
     "build": "node scripts/build.mjs",
     "content:publish": "node scripts/publish-content.mjs",
     "test:database": "node --test tests/database.test.mjs",
-    "test:build": "npm run build && node --test tests/built-site.mjs"
+    "test:build": "npm run build && node --test tests/built-site.mjs",
+    "db:login": "supabase login",
+    "db:status": "supabase migration list --project-ref cwixbyldslmxemgbjace",
+    "db:preview": "supabase db push --project-ref cwixbyldslmxemgbjace --dry-run --skip-vault",
+    "db:publish": "supabase db push --project-ref cwixbyldslmxemgbjace --skip-vault"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.0.0"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.25.0",
+    "supabase": "2.118.0"
   }
 }

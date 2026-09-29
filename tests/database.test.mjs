@@ -78,3 +78,14 @@ test('members can read knowledge and light cards but never unpublished cards',as
  await db.query('update public.cards set published=false where id=$1',[card.id]);
  await as('authenticated',A,async()=>assert.equal((await db.query('select * from public.cards')).rows.length,13));
 });
+
+test('seen operations are idempotent, isolated and never imply opening or liking',async()=>{
+ const seen=op('seen');
+ await as('authenticated',A,async()=>{const first=await apply(A,[seen]);const again=await apply(A,[seen,op('seen')]);assert(first[0].seen_at);assert.equal(first[0].seen_at,again[0].seen_at);assert.equal(again[0].opens,0);assert.equal(again[0].reaction,null);});
+ await as('authenticated',B,async()=>{assert.deepEqual((await db.query('select * from public.personal_records')).rows,[]);await assert.rejects(apply(A,[op('seen')]),/Wrong account/);});
+ await as('anon',null,()=>assert.rejects(apply(A,[op('seen')]),/permission denied/));
+});
+test('seen-only guest imports preserve cloud feedback and survive duplicate retries',async()=>{
+ const imported=op('import',{opens:0,reaction:null,ratedAt:null,lastOpenedAt:null,seenAt:'2026-09-20T00:00:00Z'});
+ await as('authenticated',A,async()=>{const rows=await apply(A,[imported,imported]);assert(rows[0].seen_at);assert.equal(rows[0].opens,0);assert.equal(rows[0].reaction,null);});
+});

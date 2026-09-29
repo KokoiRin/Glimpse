@@ -21,3 +21,38 @@ test('clear removes explicit feedback and persisted seen history',()=>{const s=m
 test('card catalog uses stable ids, explicit concept origins and the requested scope',()=>{assert.equal(cards.length,14);assert.equal(new Set(cards.map(c=>c.id)).size,cards.length);assert.equal(cards.filter(c=>c.energy==='high').length,8);assert.equal(cards.filter(c=>c.energy==='low').length,6);for(const c of cards){assert(c.parent.includes('→'));assert(c.version>=1);assert(c.teaser&&c.trial&&c.more&&c.source);assert(!/游戏|个人项目/.test(c.type));if(c.link)assert(c.link.startsWith('https://'));}});
 
 test('large catalogs still produce at most fourteen cards per round',()=>{const many=Array.from({length:40},(_,i)=>({...cards[0],id:`item-${i}`}));const f=createFeed(many);let count=1;while(f.next())count++;assert.equal(count,14);});
+
+test('unseen cards exhaust before a randomly shuffled history round, including a short final new round',()=>{
+ const seenIds=new Set(cards.slice(0,12).map(c=>c.id));
+ const feed=createFeed(cards,{seenIds,random:()=>0.25});const newIds=[];
+ do{newIds.push(feed.current.id);seenIds.add(feed.current.id);}while(feed.next());
+ assert.equal(newIds.length,2);assert(newIds.every(id=>cards.slice(12).some(c=>c.id===id)));
+ const history=createFeed(cards,{seenIds,limit:5,random:()=>0.25});const old=[];
+ do{old.push(history.current.id);}while(history.next());assert.equal(old.length,5);assert.equal(new Set(old).size,5);
+ assert.notDeepEqual(old,cards.slice(0,5).map(c=>c.id));
+});
+test('drawing a deck does not mark undelivered cards seen and explicit history can open a seen card',()=>{
+ const seenIds=new Set([cards[0].id]),f=createFeed(cards,{seenIds,limit:2});
+ assert.equal(seenIds.size,1);assert.notEqual(f.current.id,cards[0].id);
+ const h=createFeed(cards,{seenIds,firstId:cards[0].id});assert.equal(h.current.id,cards[0].id);
+});
+test('a seen card stays seen after edits and a new id is preferred after all old cards were read',()=>{
+ const seenIds=new Set(cards.map(c=>c.id));const edited={...cards[0],version:2},fresh={...cards[0],id:'fresh'};
+ assert.equal(createFeed([...cards.slice(1),edited,fresh],{seenIds}).current.id,'fresh');
+});
+test('seeing a guest card persists independently of opening or explicit feedback',()=>{
+ const s=memory(),f=createFeedback(s);f.see(cards[0]);const at=f.get(cards[0].id).seenAt;f.see(cards[0]);
+ const row=createFeedback(s).get(cards[0].id);assert.equal(row.seenAt,at);assert.equal(row.opens,0);assert.equal(row.reaction,null);
+});
+
+test('one hundred new cards are each delivered once before historical replay begins',()=>{
+ const batch=JSON.parse(readFileSync(new URL('../content/2026-09-29-light-100.json',import.meta.url))).cards;
+ const seenIds=new Set(cards.map(c=>c.id)),delivered=[];
+ while(seenIds.size<cards.length+100){
+  const f=createFeed([...cards,...batch],{seenIds});let round=0;
+  do{assert(!seenIds.has(f.current.id));seenIds.add(f.current.id);delivered.push(f.current.id);round++;}while(f.next());
+  assert(round<=14);
+ }
+ assert.equal(delivered.length,100);assert.equal(new Set(delivered).size,100);
+ const replay=createFeed([...cards,...batch],{seenIds});assert(seenIds.has(replay.current.id));
+});

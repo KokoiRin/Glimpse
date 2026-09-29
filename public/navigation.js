@@ -1,6 +1,9 @@
 // One visit owns an ordered deck. Revisiting never draws a different card.
-export function createFeed(cards, { energy = 'any', previousId, firstId, random = Math.random, limit = 14 } = {}) {
-  const deck = cards.filter(card => energy === 'any' || card.energy === 'low');
+export function createFeed(cards, { energy = 'any', previousId, firstId, random = Math.random, limit = 14, seenIds = new Set() } = {}) {
+  const eligible = cards.filter(card => energy === 'any' || card.energy === 'low');
+  const unseen = eligible.filter(card => !seenIds.has(card.id));
+  // Exhaust the unseen pool before drawing a random round from history.
+  const deck = unseen.length && !firstId ? unseen : eligible;
   for (let index = deck.length - 1; index > 0; index--) {
     const other = Math.floor(random() * (index + 1));
     [deck[index], deck[other]] = [deck[other], deck[index]];

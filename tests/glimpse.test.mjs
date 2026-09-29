@@ -11,12 +11,12 @@ import { createCatalog } from '../public/catalog.js';
 const appCode = readFileSync(resolve(root, 'app.js'), 'utf8').replace(/^import .*;$/gm, '').replace('export const ready','const ready');
 
 // Exercise the shipped controller with in-memory browser boundaries, not a copy of its rules.
-async function boot({blocked=false, saved, hidden=false,user=null}={}) {
+async function boot({blocked=false, saved, hidden=false,user=null,remote={list:async()=>[],apply:async()=>[]}}={}) {
  const nodes=new Map(), store=new Map(), handlers={}; let time=0,changeUser;
  if(saved)store.set('rin-glimpse-events-v1',saved);
  const node=id=>{if(!nodes.has(id))nodes.set(id,{innerHTML:'',textContent:'',open:false,style:{},addEventListener(type,fn){if(type==='close')this.closeHandler=fn;else this[type]=fn;},attributes:{},setAttribute(key,value){this.attributes[key]=value;},classList:{toggle(){}},close(){this.open=false;this.closeHandler?.();},showModal(){this.open=true;},focus(){},scrollIntoView(){},replaceChildren(){this.innerHTML='';},querySelector(){return node('child');},querySelectorAll(){return [];}});return nodes.get(id);};
  const document={hidden,getElementById:node,querySelector:node,addEventListener(type,fn){handlers[type]=fn;}};
- const context={createRecords,createCatalog,createFeed,swipeDirection,__SUPABASE_URL__:'http://fixture.test',__SUPABASE_KEY__:'test-key',createCloud:()=>({fetchCards:async()=>cards,auth:{signOut:async()=>({})},records:{list:async()=>[],apply:async()=>[]}}),initializeAuth:async({onUser})=>{changeUser=onUser;onUser(user);return {};},document,performance:{now:()=>time},localStorage:{getItem:k=>{if(blocked)throw Error('blocked');return store.get(k)??null;},setItem:(k,v)=>{if(blocked)throw Error('blocked');store.set(k,v);},removeItem:k=>store.delete(k)},window:{scrollTo(){},addEventListener(type,fn){handlers[type]=fn;}},history:{replaceState(){},pushState(){},back(){}},location:{pathname:'/',href:'http://fixture.test/'},URL,Blob,Date,Math,console};
+ const context={createRecords,createCatalog,createFeed,swipeDirection,__SUPABASE_URL__:'http://fixture.test',__SUPABASE_KEY__:'test-key',createCloud:()=>({fetchCards:async()=>cards,auth:{signOut:async()=>({})},records:remote}),initializeAuth:async({onUser})=>{changeUser=onUser;onUser(user);return {};},document,performance:{now:()=>time},localStorage:{getItem:k=>{if(blocked)throw Error('blocked');return store.get(k)??null;},setItem:(k,v)=>{if(blocked)throw Error('blocked');store.set(k,v);},removeItem:k=>store.delete(k)},window:{scrollTo(){},addEventListener(type,fn){handlers[type]=fn;}},history:{replaceState(){},pushState(){},back(){}},location:{pathname:'/',href:'http://fixture.test/'},URL,Blob,Date,Math,console};
  await vm.runInNewContext(appCode+'\nready',context);
  return {node,store,handlers,document,setUser:u=>changeUser(u),tick:n=>{time+=n;},events:()=>JSON.parse(store.get('rin-glimpse-events-v1')||'[]')};
 }
@@ -92,4 +92,26 @@ test('logout immediately clears member detail and cannot restore it through brow
 test('refreshing the same member session preserves the current round and detail',async()=>{
  const h=await boot({user:{id:'a'}});h.node('open').click();const markup=h.node('#main').innerHTML;
  h.setUser({id:'a'});await settle();assert.equal(h.node('#main').innerHTML,markup);
+});
+
+test('an unseen foreground card is persisted without requiring the detail button',async()=>{
+ const h=await boot(),id=h.events().at(-1).cardId,row=JSON.parse(h.store.get('glimpse-records-v1'))[id];
+ assert(row.seenAt);assert.equal(row.opens,0);assert.equal(row.reaction,null);
+ h.node('records').click();assert.match(h.node('record-tabs').innerHTML,/浏览过/);assert.match(h.node('record-list').innerHTML,new RegExp(id));
+});
+test('background loading does not mark a card seen until it becomes visible',async()=>{
+ const h=await boot({hidden:true});assert.equal(h.store.has('glimpse-records-v1'),false);
+ assert.equal(h.events().filter(e=>e.action==='impression').length,0);
+ h.document.hidden=false;h.handlers.visibilitychange();assert.equal(h.events().filter(e=>e.action==='impression').length,1);
+ assert.equal(Object.keys(JSON.parse(h.store.get('glimpse-records-v1'))).length,1);
+});
+
+test('a new device waits for synced seen records before choosing its first card',async()=>{
+ let release;
+ const remote={list:()=>new Promise(resolve=>{release=resolve;}),apply:async()=>[]};
+ const pending=boot({user:{id:'a'},remote});await settle();
+ release(cards.slice(0,-1).map(c=>({card_id:c.id,metadata:c,opens:0,reaction:null,seen_at:'2026-09-01T00:00:00Z'})));
+ const h=await pending;const events=JSON.parse(h.store.get('glimpse-events-v2:a'));
+ assert.equal(events.find(e=>e.action==='impression').cardId,cards.at(-1).id);
+ h.node('skip').click();assert.match(h.node('#main').innerHTML,/这几张/);
 });

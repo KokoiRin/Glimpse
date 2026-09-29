@@ -4,12 +4,13 @@ const TRANSFER_KEY = 'glimpse-guest-transfer-v1';
 const accountKey = id => `glimpse-account-v1:${id}`;
 const clone = value => structuredClone(value);
 const metadata = card => ({id:card.id,title:card.title,topic:card.topic,parent:card.parent,version:card.version});
-function empty(card) { return {...metadata(card),opens:0,reaction:null,lastOpenedAt:null,ratedAt:null}; }
+function empty(card) { return {...metadata(card),opens:0,reaction:null,lastOpenedAt:null,ratedAt:null,seenAt:null}; }
 export function projectRecords(base, ops) {
   const rows = clone(base);
   for (const op of ops) {
     const old = rows[op.card.id] || empty(op.card);
     const row = rows[op.card.id] = {...old,...op.card};
+    row.seenAt ||= old.lastOpenedAt || old.ratedAt || (op.kind === 'import' ? (op.seenAt || op.lastOpenedAt || op.ratedAt) : op.at) || null;
     if (op.kind === 'open') { row.opens++; row.lastOpenedAt=op.at; }
     if (op.kind === 'rate') { row.reaction=op.reaction; row.ratedAt=op.at; }
     if (op.kind === 'import') {
@@ -21,7 +22,7 @@ export function projectRecords(base, ops) {
   return rows;
 }
 function fromCloud(rows) {
-  return Object.fromEntries(rows.map(row=>[row.card_id,{...row.metadata,id:row.card_id,opens:Number(row.opens),reaction:row.reaction,lastOpenedAt:row.last_opened_at,ratedAt:row.rated_at}]));
+  return Object.fromEntries(rows.map(row=>[row.card_id,{...row.metadata,id:row.card_id,opens:Number(row.opens),reaction:row.reaction,lastOpenedAt:row.last_opened_at,ratedAt:row.rated_at,seenAt:row.seen_at || row.last_opened_at || row.rated_at || null}]));
 }
 export function createRecords({storage, remote, onChange=()=>{}, uuid=()=>crypto.randomUUID(), now=()=>new Date().toISOString()}) {
   let user=null;
@@ -57,7 +58,7 @@ export function createRecords({storage, remote, onChange=()=>{}, uuid=()=>crypto
   function notify(id=user?.id) { if (id === user?.id) onChange(); }
   function values() { if (!user) return Object.fromEntries(guest.all().map(row=>[row.id,row])); const s=load(user.id); return projectRecords(s.base,s.pending); }
   function append(card,kind,extra={}) {
-    if (!user) { if(kind==='open')guest.open(card); else guest.rate(card,extra.reaction); notify();return; }
+    if (!user) { if(kind==='seen')guest.see(card,extra.at); else if(kind==='open')guest.open(card); else guest.rate(card,extra.reaction); notify();return; }
     const id=user.id, state=load(id);
     state.pending.push({op_id:uuid(),kind,card:metadata(card),at:now(),...extra});
     persist(id);notify(id);void sync();
@@ -94,6 +95,8 @@ export function createRecords({storage, remote, onChange=()=>{}, uuid=()=>crypto
     get hasGuestRecords(){return !!user && !transfer && guest.all().length>0;},
     get(id){return clone(values()[id]);},
     all(){return Object.values(values()).map(clone);},
+    hasSeen(id){const row=values()[id];return !!(row?.seenAt || row?.lastOpenedAt || row?.ratedAt || row?.opens>0);},
+    see(card,at=now()){if(!this.hasSeen(card.id))append(card,'seen',{at});},
     open(card){append(card,'open');},
     rate(card,reaction){if(![null,'like','dislike'].includes(reaction))throw Error('Unknown reaction');append(card,'rate',{reaction});},
     sync,
@@ -102,7 +105,7 @@ export function createRecords({storage, remote, onChange=()=>{}, uuid=()=>crypto
       if(transfer){const ok=recoverTransfer();notify();if(ok)await sync();return ok;}
       const rows=guest.all();if(!rows.length)return true;
       const id=user.id;
-      const ops=rows.map(row=>({op_id:uuid(),kind:'import',card:metadata(row),at:now(),opens:row.opens,reaction:row.reaction,lastOpenedAt:row.lastOpenedAt,ratedAt:row.ratedAt}));
+      const ops=rows.map(row=>({op_id:uuid(),kind:'import',card:metadata(row),at:now(),opens:row.opens,reaction:row.reaction,lastOpenedAt:row.lastOpenedAt,ratedAt:row.ratedAt,seenAt:row.seenAt}));
       try {
         transfer={accountId:id,rawGuest:storage.getItem(GUEST_KEY),ops};
         storage.setItem(TRANSFER_KEY,JSON.stringify(transfer));

@@ -1,0 +1,5 @@
+# CLI migration configuration. Remote Auth is managed separately.
+project_id = "glimpse"
+
+[db.seed]
+enabled = false

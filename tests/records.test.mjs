@@ -6,7 +6,8 @@ const card={id:'test-card',version:1,title:'卡片',topic:'test',parent:'测试 
 function memory(){const map=new Map();return {getItem:k=>map.get(k)||null,setItem:(k,v)=>map.set(k,v),removeItem:k=>map.delete(k)};}
 function server(){
  const data=new Map(),seen=new Set();let failure=false;
- return {set fail(v){failure=v;},async list(id){if(failure)throw Error();return structuredClone([...data.values()].filter(r=>r.user_id===id));},async apply(ops,id){if(failure)throw Error();for(const op of ops){const key=`${id}:${op.op_id}`;if(seen.has(key))continue;seen.add(key);const rid=`${id}:${op.card.id}`,row=data.get(rid)||{user_id:id,card_id:op.card.id,metadata:op.card,opens:0,reaction:null,last_opened_at:null,rated_at:null};if(op.kind==='open')row.opens++;else if(op.kind==='rate'){row.reaction=op.reaction;row.rated_at=op.at;}else{row.opens+=op.opens;if(!row.rated_at){row.reaction=op.reaction;row.rated_at=op.ratedAt;}}data.set(rid,row);}return this.list(id);}};
+ return {set fail(v){failure=v;},async list(id){if(failure)throw Error();return structuredClone([...data.values()].filter(r=>r.user_id===id));},async apply(ops,id){if(failure)throw Error();for(const op of ops){const key=`${id}:${op.op_id}`;if(seen.has(key))continue;seen.add(key);const rid=`${id}:${op.card.id}`,row=data.get(rid)||{user_id:id,card_id:op.card.id,metadata:op.card,opens:0,reaction:null,last_opened_at:null,rated_at:null};row.seen_at ||= op.seenAt || op.at;
+ if(op.kind==='open')row.opens++;else if(op.kind==='rate'){row.reaction=op.reaction;row.rated_at=op.at;}else if(op.kind==='import'){row.opens+=op.opens;if(!row.rated_at){row.reaction=op.reaction;row.rated_at=op.ratedAt;}}data.set(rid,row);}return this.list(id);}};
 }
 test('offline actions remain in a durable queue and sync once after reconnecting',async()=>{
  const storage=memory(),remote=server();remote.fail=true;
@@ -47,4 +48,17 @@ test('interrupted guest cleanup is recovered without duplicating imported record
  assert(base.getItem('glimpse-guest-transfer-v1'));
  const second=createRecords({storage:base,remote});second.setUser({id:'a'});await second.sync();
  assert.equal(second.get(card.id).opens,1);assert.equal(second.hasGuestRecords,false);assert.equal(base.getItem('glimpse-records-v1'),null);
+});
+
+test('offline seen records survive reload and sync to another device without opening counts or reactions',async()=>{
+ const s=memory(),remote=server();remote.fail=true;const a=createRecords({storage:s,remote});a.setUser({id:'a'});a.see(card);a.see(card);await a.sync();
+ assert(a.hasSeen(card.id));assert.equal(a.pendingCount,1);assert.equal(a.get(card.id).opens,0);
+ const b=createRecords({storage:s,remote});b.setUser({id:'a'});assert(b.hasSeen(card.id));remote.fail=false;await b.sync();
+ const c=createRecords({storage:memory(),remote});c.setUser({id:'a'});await c.sync();assert(c.hasSeen(card.id));assert.equal(c.get(card.id).opens,0);assert.equal(c.get(card.id).reaction,null);
+ c.setUser({id:'b'});assert.equal(c.hasSeen(card.id),false);c.setUser(null);assert.equal(c.hasSeen(card.id),false);
+});
+test('merging guest seen-only records is durable and does not fabricate opening or rating',async()=>{
+ const s=memory(),remote=server(),guest=createFeedback(s);guest.see(card);
+ const a=createRecords({storage:s,remote});a.setUser({id:'a'});await a.mergeGuest();await a.mergeGuest();
+ assert(a.hasSeen(card.id));assert.equal(a.get(card.id).opens,0);assert.equal(a.get(card.id).reaction,null);
 });
